@@ -12,14 +12,14 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 {
     [TestClass]
-    [Ignore("TODO: Enable when invalid cert server is back online.")]
     [TestCategory("InvalidServiceCertificate")]
     public class IoTHubCertificateValidationE2ETest : E2EMsTestBase
     {
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task RegistryManager_QueryDevicesInvalidServiceCertificateHttp_Fails()
         {
-            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionStringInvalidServiceCertificate);
+            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionStringInvalidServiceCertificate);
             IQuery query = rm.CreateQuery("select * from devices");
             IotHubCommunicationException exception = await Assert.ThrowsExceptionAsync<IotHubCommunicationException>(
                 () => query.GetNextAsTwinAsync()).ConfigureAwait(false);
@@ -31,7 +31,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 #endif
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ServiceClient_SendMessageToDeviceInvalidServiceCertificateAmqpTcp_Fails()
         {
             TransportType transport = TransportType.Amqp;
@@ -39,7 +40,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
                 () => TestServiceClientInvalidServiceCertificate(transport)).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ServiceClient_SendMessageToDeviceInvalidServiceCertificateAmqpWs_Fails()
         {
             TransportType transport = TransportType.Amqp_WebSocket_Only;
@@ -52,16 +54,17 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
         private static async Task TestServiceClientInvalidServiceCertificate(TransportType transport)
         {
             using var service = ServiceClient.CreateFromConnectionString(
-                TestConfiguration.IoTHub.ConnectionStringInvalidServiceCertificate,
+                TestConfiguration.IotHub.ConnectionStringInvalidServiceCertificate,
                 transport);
             using var testMessage = new Message();
             await service.SendAsync("testDevice1", testMessage).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task JobClient_ScheduleTwinUpdateInvalidServiceCertificateHttp_Fails()
         {
-            using var jobClient = JobClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionStringInvalidServiceCertificate);
+            using var jobClient = JobClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionStringInvalidServiceCertificate);
             IotHubCommunicationException exception = await Assert.ThrowsExceptionAsync<IotHubCommunicationException>(
                 () => jobClient.ScheduleTwinUpdateAsync(
                     "testDevice",
@@ -77,7 +80,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 #endif
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_SendAsyncInvalidServiceCertificateAmqpTcp_Fails()
         {
             Client.TransportType transport = Client.TransportType.Amqp_Tcp_Only;
@@ -85,7 +89,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
                 () => TestDeviceClientInvalidServiceCertificate(transport)).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_SendAsyncInvalidServiceCertificateMqttTcp_Fails()
         {
             Client.TransportType transport = Client.TransportType.Mqtt_Tcp_Only;
@@ -93,7 +98,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
                 () => TestDeviceClientInvalidServiceCertificate(transport)).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_SendAsyncInvalidServiceCertificateHttp_Fails()
         {
             Client.TransportType transport = Client.TransportType.Http1;
@@ -107,7 +113,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 #endif
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_SendAsyncInvalidServiceCertificateAmqpWs_Fails()
         {
             Client.TransportType transport = Client.TransportType.Amqp_WebSocket_Only;
@@ -117,7 +124,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             Assert.IsInstanceOfType(exception.InnerException.InnerException.InnerException, typeof(AuthenticationException));
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_SendAsyncInvalidServiceCertificateMqttWs_Fails()
         {
             Client.TransportType transport = Client.TransportType.Mqtt_WebSocket_Only;
@@ -131,7 +139,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
         {
             using var deviceClient =
                 DeviceClient.CreateFromConnectionString(
-                    TestConfiguration.IoTHub.DeviceConnectionStringInvalidServiceCertificate,
+                    TestConfiguration.IotHub.DeviceConnectionStringInvalidServiceCertificate,
                     transport);
             using var testMessage = new Client.Message();
             await deviceClient.SendEventAsync(testMessage).ConfigureAwait(false);

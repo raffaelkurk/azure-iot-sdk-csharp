@@ -94,7 +94,9 @@ namespace Microsoft.Azure.Devices.Client.Transport.AmqpIot
 
             foreach (Message message in messages)
             {
+#pragma warning disable CA2000 // Dispose objects before losing scope
                 using AmqpMessage amqpMessage = AmqpIotMessageConverter.MessageToAmqpMessage(message);
+#pragma warning restore CA2000 // Dispose objects before losing scope
                 var data = new Data
                 {
                     Value = AmqpIotMessageConverter.ReadStream(amqpMessage.ToStream()),
@@ -204,7 +206,7 @@ namespace Microsoft.Azure.Devices.Client.Transport.AmqpIot
             if (Logging.IsEnabled)
                 Logging.Enter(this, nameof(SendTwinPatchMessageAsync));
 
-            string body = JsonConvert.SerializeObject(reportedProperties);
+            string body = JsonConvert.SerializeObject(reportedProperties, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
             var bodyStream = new MemoryStream(Encoding.UTF8.GetBytes(body));
 
             using var amqpMessage = AmqpMessage.Create(bodyStream, true);

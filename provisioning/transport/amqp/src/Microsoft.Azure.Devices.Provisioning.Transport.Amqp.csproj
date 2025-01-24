@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net5.0;netstandard2.1;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;netstandard2.1;netstandard2.0</TargetFrameworks>
     <LangVersion>8.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RootNamespace>Microsoft.Azure.Devices.Provisioning.Client.Transport</RootNamespace>
@@ -21,8 +21,16 @@
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
 
+  <!-- 
+    MSBuild flags Microsoft.CodeAnalysis.NetAnalyzers v6.0.0 with a warning because v7.0.0-preview has been released and MSBuild wants the projects to be updated to the newer version.
+    Since we will not take dependency on preview packages for our GA nugets, we'll temporarily skip analyzers upgrade warning. 
+  -->
   <PropertyGroup>
-    <Version>1.16.4</Version>
+    <_SkipUpgradeNetAnalyzersNuGetWarning>true</_SkipUpgradeNetAnalyzersNuGetWarning>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>1.16.6</Version>
     <Title>Microsoft Azure IoT Provisioning Device Client AMQP Transport</Title>
     <IncludeSource>True</IncludeSource>
     <IncludeSymbols>True</IncludeSymbols>
@@ -93,8 +101,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Amqp" Version="2.5.12" />
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="6.0.0">
+    <PackageReference Include="Microsoft.Azure.Amqp" Version="2.6.9" />
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

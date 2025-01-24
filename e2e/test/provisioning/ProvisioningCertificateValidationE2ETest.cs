@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Linq;
 using System.IO;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
@@ -16,7 +17,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Microsoft.Azure.Devices.E2ETests.Provisioning
 {
     [TestClass]
-    [Ignore("TODO: Enable when invalid cert server is back online.")]
     [TestCategory("InvalidServiceCertificate")]
     public class ProvisioningCertificateValidationE2ETest : E2EMsTestBase
     {
@@ -26,10 +26,13 @@ namespace Microsoft.Azure.Devices.E2ETests.Provisioning
         public static void TestClassSetup(TestContext _)
         {
             // Create a folder to hold the DPS client certificates and X509 self-signed certificates. If a folder by the same name already exists, it will be used.
-            s_x509CertificatesFolder = Directory.CreateDirectory($"x509Certificates-{nameof(ProvisioningCertificateValidationE2ETest)}-{Guid.NewGuid()}");
+            // Shorten the folder name to avoid overall file path become too long and cause error in the test
+            string s_folderName = "x509-" + nameof(ProvisioningCertificateValidationE2ETest).Split('.').Last() + "-" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('+', '-').Replace('/', '.').Trim('=');
+            s_x509CertificatesFolder = Directory.CreateDirectory(s_folderName);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ProvisioningServiceClient_QueryInvalidServiceCertificateHttp_Fails()
         {
             using var provisioningServiceClient = ProvisioningServiceClient.CreateFromConnectionString(
@@ -47,7 +50,8 @@ namespace Microsoft.Azure.Devices.E2ETests.Provisioning
 #endif
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ProvisioningDeviceClient_RegisterAsyncInvalidServiceCertificateAmqpTcp_Fails()
         {
             using var transport = new ProvisioningTransportHandlerAmqp(TransportFallbackType.TcpOnly);
@@ -57,7 +61,8 @@ namespace Microsoft.Azure.Devices.E2ETests.Provisioning
             Assert.IsInstanceOfType(exception.InnerException, typeof(AuthenticationException));
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ProvisioningDeviceClient_RegisterAsyncInvalidServiceCertificateMqttTcp_Fails()
         {
             using var transport = new ProvisioningTransportHandlerMqtt(TransportFallbackType.TcpOnly);
@@ -74,7 +79,8 @@ namespace Microsoft.Azure.Devices.E2ETests.Provisioning
             }
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ProvisioningDeviceClient_RegisterAsyncInvalidServiceCertificateHttp_Fails()
         {
             using var transport = new ProvisioningTransportHandlerHttp();
@@ -88,7 +94,8 @@ namespace Microsoft.Azure.Devices.E2ETests.Provisioning
 #endif
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ProvisioningDeviceClient_RegisterAsyncInvalidServiceCertificateAmqpWs_Fails()
         {
             using var transport = new ProvisioningTransportHandlerAmqp(TransportFallbackType.WebSocketOnly);
@@ -98,7 +105,8 @@ namespace Microsoft.Azure.Devices.E2ETests.Provisioning
             Assert.IsInstanceOfType(exception.InnerException.InnerException.InnerException, typeof(AuthenticationException));
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task ProvisioningDeviceClient_RegisterAsyncInvalidServiceCertificateMqttWs_Fails()
         {
             using var transport = new ProvisioningTransportHandlerMqtt(TransportFallbackType.WebSocketOnly);
@@ -110,8 +118,9 @@ namespace Microsoft.Azure.Devices.E2ETests.Provisioning
 
         private async Task TestInvalidServiceCertificate(ProvisioningTransportHandler transport)
         {
-            string certificateSubject = $"{nameof(ProvisioningCertificateValidationE2ETest)}-{Guid.NewGuid()}";
-            X509Certificate2Helper.GenerateSelfSignedCertificateFiles(certificateSubject, s_x509CertificatesFolder, Logger);
+            // Shorten the file name to avoid overall file path become too long and cause error in the test
+            string certificateSubject = "cert-" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('+', '-').Replace('/', '.').Trim('=');
+            X509Certificate2Helper.GenerateSelfSignedCertificateFiles(certificateSubject, s_x509CertificatesFolder);
 
             using X509Certificate2 cert = X509Certificate2Helper.CreateX509Certificate2FromPfxFile(certificateSubject, s_x509CertificatesFolder);
             using var security = new SecurityProviderX509Certificate(cert);

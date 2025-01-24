@@ -34,8 +34,9 @@ namespace Microsoft.Azure.Devices.Client
     {
         private const string ModuleMethodUriFormat = "/twins/{0}/modules/{1}/methods?" + ClientApiVersionHelper.ApiVersionQueryStringLatest;
         private const string DeviceMethodUriFormat = "/twins/{0}/methods?" + ClientApiVersionHelper.ApiVersionQueryStringLatest;
-        private bool _isAnEdgeModule;
+        private readonly bool _isAnEdgeModule;
         private readonly ICertificateValidator _certValidator;
+        private HttpTransportHandler _httpTransportHandler;
 
         internal InternalClient InternalClient { get; private set; }
 
@@ -268,7 +269,7 @@ namespace Microsoft.Azure.Devices.Client
         /// </summary>
         /// <remarks>
         /// The default is:
-        /// <c>new ExponentialBackoff(int.MaxValue, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(100));</c>
+        /// <code>new ExponentialBackoff(int.MaxValue, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(100));</code>
         /// </remarks>
         /// <param name="retryPolicy">The retry policy.</param>
         public void SetRetryPolicy(IRetryPolicy retryPolicy)
@@ -283,14 +284,16 @@ namespace Microsoft.Azure.Devices.Client
 
         /// <summary>
         /// Explicitly open the ModuleClient instance.
+        /// </summary>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
-        /// </summary>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task OpenAsync(CancellationToken cancellationToken) => InternalClient.OpenAsync(cancellationToken);
 
         /// <summary>
         /// Close the ModuleClient instance.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task CloseAsync() => InternalClient.CloseAsync();
 
         /// <summary>
@@ -298,6 +301,7 @@ namespace Microsoft.Azure.Devices.Client
         /// </summary>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task CloseAsync(CancellationToken cancellationToken) => InternalClient.CloseAsync(cancellationToken);
 
         /// <summary>
@@ -305,6 +309,7 @@ namespace Microsoft.Azure.Devices.Client
         /// </summary>
         /// <param name="lockToken">The message lockToken.</param>
         /// <returns>The lock identifier for the previously received message</returns>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task CompleteAsync(string lockToken) => InternalClient.CompleteAsync(lockToken);
 
         /// <summary>
@@ -313,6 +318,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="lockToken">The message lockToken.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The lock identifier for the previously received message</returns>
         public Task CompleteAsync(string lockToken, CancellationToken cancellationToken) => InternalClient.CompleteAsync(lockToken, cancellationToken);
 
@@ -320,6 +326,7 @@ namespace Microsoft.Azure.Devices.Client
         /// Deletes a received message from the module queue.
         /// </summary>
         /// <param name="message">The message.</param>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The previously received message</returns>
         public Task CompleteAsync(Message message) => InternalClient.CompleteAsync(message);
 
@@ -329,6 +336,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <param name="message">The message.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The previously received message</returns>
         public Task CompleteAsync(Message message, CancellationToken cancellationToken) => InternalClient.CompleteAsync(message, cancellationToken);
 
@@ -336,6 +344,7 @@ namespace Microsoft.Azure.Devices.Client
         /// Puts a received message back onto the module queue.
         /// </summary>
         /// <param name="lockToken">The message lockToken.</param>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The previously received message</returns>
         public Task AbandonAsync(string lockToken) => InternalClient.AbandonAsync(lockToken);
 
@@ -345,12 +354,14 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="lockToken">The message lockToken.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The previously received message</returns>
         public Task AbandonAsync(string lockToken, CancellationToken cancellationToken) => InternalClient.AbandonAsync(lockToken, cancellationToken);
 
         /// <summary>
         /// Puts a received message back onto the module queue.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The lock identifier for the previously received message</returns>
         public Task AbandonAsync(Message message) => InternalClient.AbandonAsync(message);
 
@@ -360,12 +371,17 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="message">The message.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The lock identifier for the previously received message</returns>
         public Task AbandonAsync(Message message, CancellationToken cancellationToken) => InternalClient.AbandonAsync(message, cancellationToken);
 
         /// <summary>
         /// Sends an event to IoT hub.
         /// </summary>
+        /// <remarks>
+        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
+        /// Please note that the list of exceptions is not exhaustive.
+        /// </remarks>
         /// <param name="message">The message.</param>
         /// <exception cref="ArgumentNullException">Thrown when a required parameter is null.</exception>
         /// <exception cref="TimeoutException">Thrown if the service does not respond to the request within the timeout specified for the operation.
@@ -379,16 +395,17 @@ namespace Microsoft.Azure.Devices.Client
         /// <exception cref="IotHubException">Thrown if an error occurs when communicating with IoT hub service.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>true</c> then it is a transient exception.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>false</c> then it is a non-transient exception.</exception>
-        /// <remarks>
-        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
-        /// Please note that the list of exceptions is not exhaustive.
-        /// </remarks>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The message containing the event</returns>
         public Task SendEventAsync(Message message) => InternalClient.SendEventAsync(message);
 
         /// <summary>
         /// Sends an event to IoT hub.
         /// </summary>
+        /// <remarks>
+        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
+        /// Please note that the list of exceptions is not exhaustive.
+        /// </remarks>
         /// <param name="message">The message.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="ArgumentNullException">Thrown when a required parameter is null.</exception>
@@ -403,10 +420,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <exception cref="IotHubException">Thrown if an error occurs when communicating with IoT hub service.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>true</c> then it is a transient exception.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>false</c> then it is a non-transient exception.</exception>
-        /// <remarks>
-        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
-        /// Please note that the list of exceptions is not exhaustive.
-        /// </remarks>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The message containing the event</returns>
         public Task SendEventAsync(Message message, CancellationToken cancellationToken) => InternalClient.SendEventAsync(message, cancellationToken);
 
@@ -415,6 +429,7 @@ namespace Microsoft.Azure.Devices.Client
         /// For more information on IoT Edge module routing <see href="https://docs.microsoft.com/azure/iot-edge/module-composition?view=iotedge-2018-06#declare-routes"/>.
         /// </summary>
         /// <param name="messages">The messages.</param>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SendEventBatchAsync(IEnumerable<Message> messages) => InternalClient.SendEventBatchAsync(messages);
 
@@ -425,38 +440,47 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="messages">An IEnumerable set of Message objects.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SendEventBatchAsync(IEnumerable<Message> messages, CancellationToken cancellationToken) => InternalClient.SendEventBatchAsync(messages, cancellationToken);
 
         /// <summary>
-        /// Sets a new delegate for the named method. If a delegate is already associated with the named method, it will be replaced with the new delegate.
+        /// Sets a new delegate for the named method.
+        /// </summary>
+        /// <remarks>
+        /// If a delegate is already associated with the named method, it will be replaced with the new delegate.
         /// A method handler can be unset by passing a null MethodCallback.
+        /// </remarks>
         /// <param name="methodName">The name of the method to associate with the delegate.</param>
         /// <param name="methodHandler">The delegate to be used when a method with the given name is called by the cloud service.</param>
         /// <param name="userContext">generic parameter to be interpreted by the client code.</param>
-        /// </summary>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task SetMethodHandlerAsync(string methodName, MethodCallback methodHandler, object userContext) =>
             InternalClient.SetMethodHandlerAsync(methodName, methodHandler, userContext);
 
         /// <summary>
         /// Sets a new delegate for the named method. If a delegate is already associated with the named method, it will be replaced with the new delegate.
         /// A method handler can be unset by passing a null MethodCallback.
+        /// </summary>
         /// <param name="methodName">The name of the method to associate with the delegate.</param>
         /// <param name="methodHandler">The delegate to be used when a method with the given name is called by the cloud service.</param>
         /// <param name="userContext">generic parameter to be interpreted by the client code.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
-        /// </summary>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task SetMethodHandlerAsync(string methodName, MethodCallback methodHandler, object userContext, CancellationToken cancellationToken) =>
             InternalClient.SetMethodHandlerAsync(methodName, methodHandler, userContext, cancellationToken);
 
         /// <summary>
         /// Sets a new delegate that is called for a method that doesn't have a delegate registered for its name.
+        /// </summary>
+        /// <remarks>
         /// If a default delegate is already registered it will replace with the new delegate.
         /// A method handler can be unset by passing a null MethodCallback.
-        /// </summary>
+        /// </remarks>
         /// <param name="methodHandler">The delegate to be used when a method is called by the cloud service and there is no delegate registered for that method name.</param>
         /// <param name="userContext">Generic parameter to be interpreted by the client code.</param>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task SetMethodDefaultHandlerAsync(MethodCallback methodHandler, object userContext) =>
             InternalClient.SetMethodDefaultHandlerAsync(methodHandler, userContext);
 
@@ -469,14 +493,15 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="userContext">Generic parameter to be interpreted by the client code.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task SetMethodDefaultHandlerAsync(MethodCallback methodHandler, object userContext, CancellationToken cancellationToken) =>
             InternalClient.SetMethodDefaultHandlerAsync(methodHandler, userContext, cancellationToken);
 
         /// <summary>
         /// Sets a new delegate for the connection status changed callback. If a delegate is already associated,
         /// it will be replaced with the new delegate. Note that this callback will never be called if the client is configured to use HTTP as that protocol is stateless
-        /// <param name="statusChangesHandler">The name of the method to associate with the delegate.</param>
         /// </summary>
+        /// <param name="statusChangesHandler">The name of the method to associate with the delegate.</param>
         public void SetConnectionStatusChangesHandler(ConnectionStatusChangesHandler statusChangesHandler) =>
             InternalClient.SetConnectionStatusChangesHandler(statusChangesHandler);
 
@@ -490,6 +515,7 @@ namespace Microsoft.Azure.Devices.Client
         {
             Dispose(true);
             GC.SuppressFinalize(this);
+            _httpTransportHandler?.Dispose();
         }
 
 #if !NET451 && !NET472 && !NETSTANDARD2_0
@@ -502,11 +528,11 @@ namespace Microsoft.Azure.Devices.Client
         /// Includes a call to <see cref="CloseAsync()"/>.
         /// </remarks>
         /// <example>
-        /// <c>
+        /// <code language="csharp">
         /// await using var client = ModuleClient.CreateFromConnectionString(...);
-        /// </c>
+        /// </code>
         /// or
-        /// <c>
+        /// <code language="csharp">
         /// var client = ModuleClient.CreateFromConnectionString(...);
         /// try
         /// {
@@ -516,7 +542,7 @@ namespace Microsoft.Azure.Devices.Client
         /// {
         ///     await client.DisposeAsync();
         /// }
-        /// </c>
+        /// </code>
         /// </example>
         [SuppressMessage("Usage", "CA1816:Dispose methods should call SuppressFinalize", Justification = "SuppressFinalize is called by Dispose(), which this method calls.")]
         public async ValueTask DisposeAsync()
@@ -538,20 +564,20 @@ namespace Microsoft.Azure.Devices.Client
             if (disposing)
             {
                 InternalClient?.Dispose();
-                InternalClient = null;
             }
         }
 
         /// <summary>
         /// Set a callback that will be called whenever the client receives a state update
         /// (desired or reported) from the service.
-        /// Set callback value to null to clear.
         /// </summary>
         /// <remarks>
         /// This has the side-effect of subscribing to the PATCH topic on the service.
+        /// Set callback value to null to clear.
         /// </remarks>
         /// <param name="callback">Callback to call after the state update has been received and applied.</param>
         /// <param name="userContext">Context object that will be passed into callback.</param>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task SetDesiredPropertyUpdateCallbackAsync(DesiredPropertyUpdateCallback callback, object userContext) =>
             InternalClient.SetDesiredPropertyUpdateCallbackAsync(callback, userContext);
 
@@ -567,6 +593,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="userContext">Context object that will be passed into callback.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task SetDesiredPropertyUpdateCallbackAsync(DesiredPropertyUpdateCallback callback, object userContext, CancellationToken cancellationToken) =>
             InternalClient.SetDesiredPropertyUpdateCallbackAsync(callback, userContext, cancellationToken);
 
@@ -574,6 +601,7 @@ namespace Microsoft.Azure.Devices.Client
         /// Retrieve a module twin object for the current module.
         /// </summary>
         /// <returns>The module twin object for the current module</returns>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task<Twin> GetTwinAsync() => InternalClient.GetTwinAsync();
 
         /// <summary>
@@ -581,6 +609,7 @@ namespace Microsoft.Azure.Devices.Client
         /// </summary>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The module twin object for the current module</returns>
         public Task<Twin> GetTwinAsync(CancellationToken cancellationToken) => InternalClient.GetTwinAsync(cancellationToken);
 
@@ -588,6 +617,7 @@ namespace Microsoft.Azure.Devices.Client
         /// Push reported property changes up to the service.
         /// </summary>
         /// <param name="reportedProperties">Reported properties to push.</param>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task UpdateReportedPropertiesAsync(TwinCollection reportedProperties) =>
             InternalClient.UpdateReportedPropertiesAsync(reportedProperties);
 
@@ -597,6 +627,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="reportedProperties">Reported properties to push.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         public Task UpdateReportedPropertiesAsync(TwinCollection reportedProperties, CancellationToken cancellationToken) =>
             InternalClient.UpdateReportedPropertiesAsync(reportedProperties, cancellationToken);
 
@@ -607,6 +638,10 @@ namespace Microsoft.Azure.Devices.Client
         /// <summary>
         /// Sends an event to IoT hub.
         /// </summary>
+        /// <remarks>
+        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
+        /// Please note that the above list is not exhaustive.
+        /// </remarks>
         /// <param name="outputName">The output target for sending the given message.</param>
         /// <param name="message">The message to send.</param>
         /// <exception cref="ArgumentNullException">Thrown when a required parameter is null.</exception>
@@ -621,10 +656,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <exception cref="IotHubException">Thrown if an error occurs when communicating with IoT hub service.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>true</c> then it is a transient exception.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>false</c> then it is a non-transient exception.</exception>
-        /// <remarks>
-        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
-        /// Please note that the above list is not exhaustive.
-        /// </remarks>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The message containing the event</returns>
         public Task SendEventAsync(string outputName, Message message) =>
             InternalClient.SendEventAsync(outputName, message);
@@ -632,6 +664,10 @@ namespace Microsoft.Azure.Devices.Client
         /// <summary>
         /// Sends an event to IoT hub.
         /// </summary>
+        /// <remarks>
+        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
+        /// Please note that the above list is not exhaustive.
+        /// </remarks>
         /// <param name="outputName">The output target for sending the given message.</param>
         /// <param name="message">The message to send.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
@@ -647,21 +683,22 @@ namespace Microsoft.Azure.Devices.Client
         /// <exception cref="IotHubException">Thrown if an error occurs when communicating with IoT hub service.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>true</c> then it is a transient exception.
         /// If <see cref="IotHubException.IsTransient"/> is set to <c>false</c> then it is a non-transient exception.</exception>
-        /// <remarks>
-        /// In case of a transient issue, retrying the operation should work. In case of a non-transient issue, inspect the error details and take steps accordingly.
-        /// Please note that the above list is not exhaustive.
-        /// </remarks>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The message containing the event</returns>
         public Task SendEventAsync(string outputName, Message message, CancellationToken cancellationToken) =>
             InternalClient.SendEventAsync(outputName, message, cancellationToken);
 
         /// <summary>
-        /// Sends a batch of events to IoT hub. Use AMQP or HTTPs for a true batch operation. MQTT will just send the messages one after the other.
-        /// For more information on IoT Edge module routing <see href="https://docs.microsoft.com/azure/iot-edge/module-composition?view=iotedge-2018-06#declare-routes"/>
+        /// Sends a batch of events to IoT hub. Use AMQP or HTTPs for a true batch operation.
         /// </summary>
+        /// <remarks>
+        /// MQTT will just send the messages one after the other as it does not support true batching.
+        /// For more information on IoT Edge module routing <see href="https://docs.microsoft.com/azure/iot-edge/module-composition?view=iotedge-2018-06#declare-routes"/>
+        /// </remarks>
         /// <param name="outputName">The output target for sending the given message.</param>
         /// <param name="messages">A list of one or more messages to send.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SendEventBatchAsync(string outputName, IEnumerable<Message> messages) =>
             InternalClient.SendEventBatchAsync(outputName, messages);
@@ -674,6 +711,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="messages">A list of one or more messages to send.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SendEventBatchAsync(string outputName, IEnumerable<Message> messages, CancellationToken cancellationToken) =>
             InternalClient.SendEventBatchAsync(outputName, messages, cancellationToken);
@@ -686,6 +724,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="messageHandler">The delegate to be used when a message is sent to the particular inputName.</param>
         /// <param name="userContext">generic parameter to be interpreted by the client code.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SetInputMessageHandlerAsync(string inputName, MessageHandler messageHandler, object userContext) =>
             InternalClient.SetInputMessageHandlerAsync(inputName, messageHandler, userContext, _isAnEdgeModule);
@@ -699,18 +738,22 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="userContext">generic parameter to be interpreted by the client code.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SetInputMessageHandlerAsync(string inputName, MessageHandler messageHandler, object userContext, CancellationToken cancellationToken) =>
             InternalClient.SetInputMessageHandlerAsync(inputName, messageHandler, userContext, _isAnEdgeModule, cancellationToken);
 
         /// <summary>
-        /// Sets a new default delegate which applies to all endpoints. If a delegate is already associated with
-        /// the input, it will be called, else the default delegate will be called. If a default delegate was set previously,
-        /// it will be overwritten.
+        /// Sets a new default delegate which applies to all endpoints.
         /// </summary>
+        /// <remarks>
+        /// If a delegate is already associated with the input, it will be called, else the default delegate will be called.
+        /// If a default delegate was set previously, it will be overwritten.
+        /// </remarks>
         /// <param name="messageHandler">The delegate to be called when a message is sent to any input.</param>
         /// <param name="userContext">generic parameter to be interpreted by the client code.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SetMessageHandlerAsync(MessageHandler messageHandler, object userContext) =>
             InternalClient.SetMessageHandlerAsync(messageHandler, userContext, _isAnEdgeModule);
@@ -724,6 +767,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="userContext">generic parameter to be interpreted by the client code.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The task containing the event</returns>
         public Task SetMessageHandlerAsync(MessageHandler messageHandler, object userContext, CancellationToken cancellationToken) =>
             InternalClient.SetMessageHandlerAsync(messageHandler, userContext, _isAnEdgeModule, cancellationToken);
@@ -734,6 +778,7 @@ namespace Microsoft.Azure.Devices.Client
         /// </summary>
         /// <param name="deviceId">The unique identifier of the edge device to invoke the method on.</param>
         /// <param name="methodRequest">The details of the method to invoke.</param>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The result of the method invocation.</returns>
         public Task<MethodResponse> InvokeMethodAsync(string deviceId, MethodRequest methodRequest) =>
             InvokeMethodAsync(deviceId, methodRequest, CancellationToken.None);
@@ -746,12 +791,10 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="methodRequest">The details of the method to invoke.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The result of the method invocation.</returns>
-        public Task<MethodResponse> InvokeMethodAsync(string deviceId, MethodRequest methodRequest, CancellationToken cancellationToken)
-        {
-            methodRequest.ThrowIfNull(nameof(methodRequest));
-            return InvokeMethodAsync(GetDeviceMethodUri(deviceId), methodRequest, cancellationToken);
-        }
+        public Task<MethodResponse> InvokeMethodAsync(string deviceId, MethodRequest methodRequest, CancellationToken cancellationToken) =>
+            InvokeMethodAsync(GetDeviceMethodUri(deviceId), methodRequest, cancellationToken);
 
         /// <summary>
         /// Interactively invokes a method from an edge module to a different edge module.
@@ -761,6 +804,7 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="moduleId">The unique identifier of the edge module to invoke the method on.</param>
         /// <param name="methodRequest">The details of the method to invoke.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The result of the method invocation.</returns>
         public Task<MethodResponse> InvokeMethodAsync(string deviceId, string moduleId, MethodRequest methodRequest) =>
             InvokeMethodAsync(deviceId, moduleId, methodRequest, CancellationToken.None);
@@ -774,40 +818,64 @@ namespace Microsoft.Azure.Devices.Client
         /// <param name="methodRequest">The details of the method to invoke.</param>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <exception cref="OperationCanceledException">Thrown when the operation has been canceled.</exception>
+        /// <exception cref="ObjectDisposedException">When the client has been disposed.</exception>
         /// <returns>The result of the method invocation.</returns>
-        public Task<MethodResponse> InvokeMethodAsync(string deviceId, string moduleId, MethodRequest methodRequest, CancellationToken cancellationToken)
-        {
-            methodRequest.ThrowIfNull(nameof(methodRequest));
-            return InvokeMethodAsync(GetModuleMethodUri(deviceId, moduleId), methodRequest, cancellationToken);
-        }
+        public Task<MethodResponse> InvokeMethodAsync(string deviceId, string moduleId, MethodRequest methodRequest, CancellationToken cancellationToken) =>
+            InvokeMethodAsync(GetModuleMethodUri(deviceId, moduleId), methodRequest, cancellationToken);
 
         private async Task<MethodResponse> InvokeMethodAsync(Uri uri, MethodRequest methodRequest, CancellationToken cancellationToken)
         {
-            HttpClientHandler httpClientHandler = null;
-            Func<object, X509Certificate, X509Chain, SslPolicyErrors, bool> customCertificateValidation = _certValidator.GetCustomCertificateValidation();
-
-            try
+            if (InternalClient.IsDisposed)
             {
+                throw new ObjectDisposedException("IoT client", DefaultDelegatingHandler.ClientDisposedMessage);
+            }
+
+            methodRequest.ThrowIfNull(nameof(methodRequest));
+
+            if (_httpTransportHandler == null)
+            {
+                Func<object, X509Certificate, X509Chain, SslPolicyErrors, bool> customCertificateValidation = _certValidator.GetCustomCertificateValidation();
+
+                // The HTTP message handlers created in this block are disposed when this client is
+                // disposed.
+#pragma warning disable CA2000 // Dispose objects before losing scope
+#if !NET451
+                var httpMessageHandler = new HttpClientHandler();
+#else
+                var httpMessageHandler = new WebRequestHandler();
+#endif
+#pragma warning restore CA2000 // Dispose objects before losing scope
+
                 if (customCertificateValidation != null)
                 {
                     TlsVersions.Instance.SetLegacyAcceptableVersions();
 
 #if !NET451
-                    httpClientHandler = new HttpClientHandler
-                    {
-                        ServerCertificateCustomValidationCallback = customCertificateValidation,
-                        SslProtocols = TlsVersions.Instance.Preferred,
-                    };
+                    httpMessageHandler.ServerCertificateCustomValidationCallback = customCertificateValidation;
+                    httpMessageHandler.SslProtocols = TlsVersions.Instance.Preferred;
 #else
-                    httpClientHandler = new WebRequestHandler();
-                    ((WebRequestHandler)httpClientHandler).ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
+                    httpMessageHandler.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
                     {
                         return customCertificateValidation(sender, certificate, chain, errors);
                     };
 #endif
                 }
 
-                var context = new PipelineContext()
+                // We need to add the certificate to the httpTransport if DeviceAuthenticationWithX509Certificate
+                if (InternalClient.Certificate != null)
+                {
+                    httpMessageHandler.ClientCertificates.Add(InternalClient.Certificate);
+                }
+
+                // Note that this client is ignoring any HttpTransportSettings that the user may have
+                // provided. This is because the kinds of settings a user would want to override
+                // aren't as applicable for this particular operation.
+                var transportSettings = new Http1TransportSettings()
+                {
+                    HttpClient = new HttpClient(httpMessageHandler, true)
+                };
+
+                var context = new PipelineContext
                 {
                     ProductInfo = new ProductInfo
                     {
@@ -815,23 +883,12 @@ namespace Microsoft.Azure.Devices.Client
                     }
                 };
 
-                var transportSettings = new Http1TransportSettings();
-                //We need to add the certificate to the httpTransport if DeviceAuthenticationWithX509Certificate
-                if (InternalClient.Certificate != null)
-                {
-                    transportSettings.ClientCertificate = InternalClient.Certificate;
-                }
-
-                using var httpTransport = new HttpTransportHandler(context, InternalClient.IotHubConnectionString, transportSettings, httpClientHandler);
-                var methodInvokeRequest = new MethodInvokeRequest(methodRequest.Name, methodRequest.DataAsJson, methodRequest.ResponseTimeout, methodRequest.ConnectionTimeout);
-                MethodInvokeResponse result = await httpTransport.InvokeMethodAsync(methodInvokeRequest, uri, cancellationToken).ConfigureAwait(false);
-
-                return new MethodResponse(Encoding.UTF8.GetBytes(result.GetPayloadAsJson()), result.Status);
+                _httpTransportHandler = new HttpTransportHandler(context, InternalClient.IotHubConnectionString, transportSettings);
             }
-            finally
-            {
-                httpClientHandler?.Dispose();
-            }
+
+            var methodInvokeRequest = new MethodInvokeRequest(methodRequest.Name, methodRequest.DataAsJson, methodRequest.ResponseTimeout, methodRequest.ConnectionTimeout);
+            MethodInvokeResponse result = await _httpTransportHandler.InvokeMethodAsync(methodInvokeRequest, uri, cancellationToken).ConfigureAwait(false);
+            return new MethodResponse(Encoding.UTF8.GetBytes(result.GetPayloadAsJson()), result.Status);
         }
 
         private static Uri GetDeviceMethodUri(string deviceId)

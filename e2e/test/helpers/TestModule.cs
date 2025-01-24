@@ -19,17 +19,15 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
         /// <summary>
         /// Factory method.
         /// </summary>
-        /// <param name="namePrefix"></param>
-        /// <param name="type"></param>
-        public static async Task<TestModule> GetTestModuleAsync(string deviceNamePrefix, string moduleNamePrefix, MsTestLogger logger)
+        public static async Task<TestModule> GetTestModuleAsync(string deviceNamePrefix, string moduleNamePrefix)
         {
-            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(logger, deviceNamePrefix).ConfigureAwait(false);
+            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(deviceNamePrefix).ConfigureAwait(false);
 
             string deviceName = testDevice.Id;
             string moduleName = "E2E_" + moduleNamePrefix + Guid.NewGuid();
 
-            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString);
-            logger.Trace($"{nameof(GetTestModuleAsync)}: Creating module for device {deviceName}.");
+            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString);
+            VerboseTestLogger.WriteLine($"{nameof(GetTestModuleAsync)}: Creating module for device {deviceName}.");
 
             var requestModule = new Module(deviceName, moduleName);
             Module module = await rm.AddModuleAsync(requestModule).ConfigureAwait(false);
@@ -38,7 +36,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
 
             var ret = new TestModule(module);
 
-            logger.Trace($"{nameof(GetTestModuleAsync)}: Using device {ret.DeviceId} with module {ret.Id}.");
+            VerboseTestLogger.WriteLine($"{nameof(GetTestModuleAsync)}: Using device {ret.DeviceId} with module {ret.Id}.");
             return ret;
         }
 
@@ -49,7 +47,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
         {
             get
             {
-                string iotHubHostName = GetHostName(TestConfiguration.IoTHub.ConnectionString);
+                string iotHubHostName = GetHostName(TestConfiguration.IotHub.ConnectionString);
                 return $"HostName={iotHubHostName};DeviceId={_module.DeviceId};ModuleId={_module.Id};SharedAccessKey={_module.Authentication.SymmetricKey.PrimaryKey}";
             }
         }

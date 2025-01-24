@@ -38,19 +38,29 @@ namespace Microsoft.Azure.Devices.Shared
         /// <summary>
         /// Creates a <see cref="TwinCollection"/> using a JSON fragment as the body.
         /// </summary>
+        /// <remarks>
+        /// Use "JsonConvert.DeserializeObject()" instead of "JObject.Parse()" so that
+        /// we can take advantage of the internal serializer settings added in SDK and
+        /// avoid of the unexpected behavior of dropping trailing zeros caused by Newtonsoft.Json.
+        /// </remarks>
         /// <param name="twinJson">JSON fragment containing the twin data.</param>
         public TwinCollection(string twinJson)
-            : this(JObject.Parse(twinJson))
+            : this(JsonConvert.DeserializeObject<JObject>(twinJson, JsonSerializerSettingsInitializer.GetJsonSerializerSettings()))
         {
         }
 
         /// <summary>
         /// Creates a <see cref="TwinCollection"/> using the given JSON fragments for the body and metadata.
         /// </summary>
+        /// <remarks>
+        /// Use "JsonConvert.DeserializeObject()" instead of "JObject.Parse()" so that
+        /// we can take advantage of the internal serializer settings added in SDK and
+        /// avoid of the unexpected behavior of dropping trailing zeros caused by Newtonsoft.Json.
+        /// </remarks>
         /// <param name="twinJson">JSON fragment containing the twin data.</param>
         /// <param name="metadataJson">JSON fragment containing the metadata.</param>
         public TwinCollection(string twinJson, string metadataJson)
-            : this(JObject.Parse(twinJson), JObject.Parse(metadataJson))
+            : this(JsonConvert.DeserializeObject<JObject>(twinJson), JsonConvert.DeserializeObject<JObject>(metadataJson))
         {
         }
 
@@ -125,8 +135,6 @@ namespace Microsoft.Azure.Devices.Shared
         /// </summary>
         /// <param name="propertyName">Name of the property to get</param>
         /// <returns>Value for the given property name</returns>
-        [SuppressMessage("Microsoft.Design", "CA1065:DoNotRaiseExceptionsInUnexpectedLocations",
-            Justification = "AppCompat. Changing the exception to ArgumentException might break existing applications.")]
         public dynamic this[string propertyName]
         {
             get

@@ -77,6 +77,20 @@ namespace Microsoft.Azure.Devices.Provisioning.Service
         /// <summary>
         /// Getter for the list of query result Items.
         /// </summary>
+        /// <remarks>
+        /// Depending on the <see cref="Type"/>, these items can be cast to a corresponding type:
+        /// <list type="bullet">
+        /// <item><description>
+        /// <see cref="QueryResultType.Enrollment"/>: <see cref="IndividualEnrollment"/>
+        /// </description></item>
+        /// <item><description>
+        /// <see cref="QueryResultType.EnrollmentGroup"/>: <see cref="EnrollmentGroup"/>
+        /// </description></item>
+        /// <item><description>
+        /// <see cref="QueryResultType.DeviceRegistration"/>: <see cref="DeviceRegistrationState"/>
+        /// </description></item>
+        /// </list>
+        /// </remarks>
         public IEnumerable<object> Items { get; private set; }
 
         /// <summary>
@@ -114,15 +128,15 @@ namespace Microsoft.Azure.Devices.Provisioning.Service
             switch (Type)
             {
                 case QueryResultType.Enrollment:
-                    Items = JsonConvert.DeserializeObject<IEnumerable<IndividualEnrollment>>(bodyString);
+                    Items = JsonConvert.DeserializeObject<IEnumerable<IndividualEnrollment>>(bodyString, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                     break;
 
                 case QueryResultType.EnrollmentGroup:
-                    Items = JsonConvert.DeserializeObject<IEnumerable<EnrollmentGroup>>(bodyString);
+                    Items = JsonConvert.DeserializeObject<IEnumerable<EnrollmentGroup>>(bodyString, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                     break;
 
                 case QueryResultType.DeviceRegistration:
-                    Items = JsonConvert.DeserializeObject<IEnumerable<DeviceRegistrationState>>(bodyString);
+                    Items = JsonConvert.DeserializeObject<IEnumerable<DeviceRegistrationState>>(bodyString, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                     break;
 
                 default:
@@ -134,13 +148,13 @@ namespace Microsoft.Azure.Devices.Provisioning.Service
                     {
                         try
                         {
-                            Items = JsonConvert.DeserializeObject<IEnumerable<JObject>>(bodyString);
+                            Items = JsonConvert.DeserializeObject<IEnumerable<JObject>>(bodyString, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                         }
                         catch (ArgumentException)
                         {
                             try
                             {
-                                Items = JsonConvert.DeserializeObject<IEnumerable<object>>(bodyString);
+                                Items = JsonConvert.DeserializeObject<IEnumerable<object>>(bodyString, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                             }
                             catch (ArgumentException)
                             {
@@ -149,7 +163,7 @@ namespace Microsoft.Azure.Devices.Provisioning.Service
                         }
                         catch (JsonSerializationException)
                         {
-                            Items = JsonConvert.DeserializeObject<IEnumerable<object>>(bodyString);
+                            Items = JsonConvert.DeserializeObject<IEnumerable<object>>(bodyString, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                         }
                         catch (JsonReaderException)
                         {

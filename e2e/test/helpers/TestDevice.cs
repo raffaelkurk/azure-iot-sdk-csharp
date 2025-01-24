@@ -27,9 +27,9 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
     public class TestDevice : IDisposable
     {
         private const int MaxRetryCount = 5;
-        private static readonly HashSet<Type> s_throttlingExceptions = new HashSet<Type> { typeof(ThrottlingException), };
-        private static readonly HashSet<Type> s_getRetryableExceptions = new HashSet<Type>(s_throttlingExceptions) { typeof(DeviceNotFoundException) };
-        private static readonly SemaphoreSlim s_semaphore = new SemaphoreSlim(1, 1);
+        private static readonly HashSet<Type> s_throttlingExceptions = new() { typeof(ThrottlingException), };
+        private static readonly HashSet<Type> s_getRetryableExceptions = new(s_throttlingExceptions) { typeof(DeviceNotFoundException) };
+        private static readonly SemaphoreSlim s_semaphore = new(1, 1);
 
         private static readonly IRetryPolicy s_exponentialBackoffRetryStrategy = new ExponentialBackoff(
             retryCount: MaxRetryCount,
@@ -38,8 +38,6 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
             deltaBackoff: TimeSpan.FromMilliseconds(100));
 
         private X509Certificate2 _authCertificate;
-
-        private static MsTestLogger s_logger;
 
         private TestDevice(Device device, Client.IAuthenticationMethod authenticationMethod)
         {
@@ -52,9 +50,8 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
         /// </summary>
         /// <param name="namePrefix">The prefix to apply to your device name</param>
         /// <param name="type">The way the device will authenticate</param>
-        public static async Task<TestDevice> GetTestDeviceAsync(MsTestLogger logger, string namePrefix, TestDeviceType type = TestDeviceType.Sasl)
+        public static async Task<TestDevice> GetTestDeviceAsync(string namePrefix, TestDeviceType type = TestDeviceType.Sasl)
         {
-            s_logger = logger;
             string prefix = namePrefix + type + "_";
 
             try
@@ -62,7 +59,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
                 await s_semaphore.WaitAsync().ConfigureAwait(false);
                 TestDevice ret = await CreateDeviceAsync(type, prefix).ConfigureAwait(false);
 
-                s_logger.Trace($"{nameof(GetTestDeviceAsync)}: Using device {ret.Id}.");
+                VerboseTestLogger.WriteLine($"{nameof(GetTestDeviceAsync)}: Using device {ret.Id}.");
                 return ret;
             }
             finally
@@ -76,8 +73,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
             string deviceName = "E2E_" + prefix + Guid.NewGuid();
 
             // Delete existing devices named this way and create a new one.
-            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString);
-            s_logger.Trace($"{nameof(GetTestDeviceAsync)}: Creating device {deviceName} with type {type}.");
+            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString);
 
             Client.IAuthenticationMethod auth = null;
 
@@ -86,16 +82,17 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
 
             if (type == TestDeviceType.X509)
             {
+                using X509Certificate2 cert = TestConfiguration.IotHub.GetCertificateWithPrivateKey();
                 requestDevice.Authentication = new AuthenticationMechanism
                 {
                     X509Thumbprint = new X509Thumbprint
                     {
-                        PrimaryThumbprint = TestConfiguration.IoTHub.GetCertificateWithPrivateKey().Thumbprint
+                        PrimaryThumbprint = cert.Thumbprint
                     }
                 };
 
 #pragma warning disable CA2000 // Dispose objects before losing scope - X509Certificate and DeviceAuthenticationWithX509Certificate are disposed when TestDevice is disposed.
-                authCertificate = TestConfiguration.IoTHub.GetCertificateWithPrivateKey();
+                authCertificate = TestConfiguration.IotHub.GetCertificateWithPrivateKey();
                 auth = new DeviceAuthenticationWithX509Certificate(deviceName, authCertificate);
 #pragma warning restore CA2000 // Dispose objects before losing scope - X509Certificate and DeviceAuthenticationWithX509Certificate are disposed when TestDevice is disposed.
             }
@@ -109,8 +106,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
                         device = await rm.AddDeviceAsync(requestDevice).ConfigureAwait(false);
                     },
                     s_exponentialBackoffRetryStrategy,
-                    s_throttlingExceptions,
-                    s_logger)
+                    s_throttlingExceptions)
                 .ConfigureAwait(false);
 
             // Confirm the device exists in the registry before calling it good to avoid downstream test failures.
@@ -125,8 +121,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
                         }
                     },
                     s_exponentialBackoffRetryStrategy,
-                    s_getRetryableExceptions,
-                    s_logger)
+                    s_getRetryableExceptions)
                 .ConfigureAwait(false);
 
             await rm.CloseAsync().ConfigureAwait(false);
@@ -146,7 +141,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
         {
             get
             {
-                string iotHubHostName = GetHostName(TestConfiguration.IoTHub.ConnectionString);
+                string iotHubHostName = GetHostName(TestConfiguration.IotHub.ConnectionString);
                 return $"HostName={iotHubHostName};DeviceId={Device.Id};SharedAccessKey={Device.Authentication.SymmetricKey.PrimaryKey}";
             }
         }
@@ -154,7 +149,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
         /// <summary>
         /// Used in conjunction with DeviceClient.Create()
         /// </summary>
-        public string IotHubHostName => GetHostName(TestConfiguration.IoTHub.ConnectionString);
+        public static string IotHubHostName { get; } = GetHostName(TestConfiguration.IotHub.ConnectionString);
 
         /// <summary>
         /// Device Id
@@ -175,12 +170,12 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
             if (AuthenticationMethod == null)
             {
                 deviceClient = DeviceClient.CreateFromConnectionString(ConnectionString, transport, options);
-                s_logger.Trace($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from connection string: {transport} ID={TestLogger.IdOf(deviceClient)}");
+                VerboseTestLogger.WriteLine($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from connection string");
             }
             else
             {
-                deviceClient = DeviceClient.Create(IotHubHostName, AuthenticationMethod, transport, options);
-                s_logger.Trace($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from IAuthenticationMethod: {transport} ID={TestLogger.IdOf(deviceClient)}");
+                deviceClient = DeviceClient.Create(TestDevice.IotHubHostName, AuthenticationMethod, transport, options);
+                VerboseTestLogger.WriteLine($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from IAuthenticationMethod");
             }
 
             return deviceClient;
@@ -195,18 +190,18 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
                 if (authScope == ConnectionStringAuthScope.Device)
                 {
                     deviceClient = DeviceClient.CreateFromConnectionString(ConnectionString, transportSettings, options);
-                    s_logger.Trace($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from device connection string: ID={TestLogger.IdOf(deviceClient)}");
+                    VerboseTestLogger.WriteLine($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from device connection string");
                 }
                 else
                 {
-                    deviceClient = DeviceClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString, Device.Id, transportSettings, options);
-                    s_logger.Trace($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from IoTHub connection string: ID={TestLogger.IdOf(deviceClient)}");
+                    deviceClient = DeviceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString, Device.Id, transportSettings, options);
+                    VerboseTestLogger.WriteLine($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from IoTHub connection string");
                 }
             }
             else
             {
                 deviceClient = DeviceClient.Create(IotHubHostName, AuthenticationMethod, transportSettings, options);
-                s_logger.Trace($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from IAuthenticationMethod: ID={TestLogger.IdOf(deviceClient)}");
+                VerboseTestLogger.WriteLine($"{nameof(CreateDeviceClient)}: Created {nameof(DeviceClient)} {Device.Id} from IAuthenticationMethod");
             }
 
             return deviceClient;
@@ -214,7 +209,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
 
         public async Task RemoveDeviceAsync()
         {
-            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString);
+            using var rm = RegistryManager.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString);
 
             await RetryOperationHelper
                 .RetryOperationsAsync(
@@ -223,8 +218,7 @@ namespace Microsoft.Azure.Devices.E2ETests.Helpers
                         await rm.RemoveDeviceAsync(Id).ConfigureAwait(false);
                     },
                     s_exponentialBackoffRetryStrategy,
-                    s_throttlingExceptions,
-                    s_logger)
+                    s_throttlingExceptions)
                 .ConfigureAwait(false);
         }
 

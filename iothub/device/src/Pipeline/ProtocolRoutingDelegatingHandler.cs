@@ -55,7 +55,7 @@ namespace Microsoft.Azure.Devices.Client.Transport
                     await base.OpenAsync(timeoutHelper).ConfigureAwait(false);
 
                     // since Dispose is not synced with _handlerLock, double check if disposed.
-                    if (_disposed)
+                    if (_isDisposed)
                     {
                         InnerHandler?.Dispose();
                         ThrowIfDisposed();
@@ -99,7 +99,7 @@ namespace Microsoft.Azure.Devices.Client.Transport
                         $"{nameof(ProtocolRoutingDelegatingHandler)}.{nameof(OpenAsync)}");
 
                 // Configure the transportSettings for this context (Important! Within Context, 'ITransportSettings' != 'ITransportSettings[]').
-                Context.TransportSettings = transportSettings;
+                Context.TransportSettingsSelected = transportSettings;
                 CreateNewTransportHandler();
 
                 _nextTransportIndex++;
@@ -123,7 +123,7 @@ namespace Microsoft.Azure.Devices.Client.Transport
                     await base.OpenAsync(cancellationToken).ConfigureAwait(false);
 
                     // since Dispose is not synced with _handlerLock, double check if disposed.
-                    if (_disposed)
+                    if (_isDisposed)
                     {
                         InnerHandler?.Dispose();
                         ThrowIfDisposed();

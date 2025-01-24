@@ -3,7 +3,6 @@
 
 using System;
 using System.Diagnostics;
-using System.Diagnostics.Tracing;
 using System.Text;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -19,7 +18,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
     {
         private readonly string DevicePrefix = $"{nameof(ServiceClientE2ETests)}_";
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         [ExpectedException(typeof(TimeoutException))]
         [TestCategory("Flaky")]
         public async Task Message_TimeOutReachedResponse()
@@ -27,7 +27,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             await FastTimeout().ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task Message_NoTimeoutPassed()
         {
             await DefaultTimeout().ConfigureAwait(false);
@@ -47,13 +48,13 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 
         private async Task TestTimeout(TimeSpan? timeout)
         {
-            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, DevicePrefix).ConfigureAwait(false);
-            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString);
+            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(DevicePrefix).ConfigureAwait(false);
+            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString);
 
             var sw = new Stopwatch();
             sw.Start();
 
-            Logger.Trace($"Testing ServiceClient SendAsync() timeout in ticks={timeout?.Ticks}");
+            VerboseTestLogger.WriteLine($"Testing ServiceClient SendAsync() timeout in ticks={timeout?.Ticks}");
             try
             {
                 using var testMessage = new Message(Encoding.ASCII.GetBytes("Test Message"));
@@ -62,18 +63,19 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             finally
             {
                 sw.Stop();
-                Logger.Trace($"Testing ServiceClient SendAsync(): exiting test after time={sw.Elapsed}; ticks={sw.ElapsedTicks}");
+                VerboseTestLogger.WriteLine($"Testing ServiceClient SendAsync(): exiting test after time={sw.Elapsed}; ticks={sw.ElapsedTicks}");
             }
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         [DataRow(TransportType.Amqp)]
         [DataRow(TransportType.Amqp_WebSocket_Only)]
         public async Task ServiceClient_SendsMessage(TransportType transportType)
         {
             // arrange
-            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, DevicePrefix).ConfigureAwait(false);
-            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString, transportType);
+            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(DevicePrefix).ConfigureAwait(false);
+            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString, transportType);
             string messageId = Guid.NewGuid().ToString();
 
             // act and expect no exception
@@ -84,15 +86,30 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             await sender.SendAsync(testDevice.Id, message).ConfigureAwait(false);
         }
 
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
+        [DataRow(TransportType.Amqp)]
+        [DataRow(TransportType.Amqp_WebSocket_Only)]
+        public async Task ServiceClient_Open(TransportType transportType)
+        {
+            // arrange
+            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(DevicePrefix).ConfigureAwait(false);
+            using var client = ServiceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString, transportType);
+
+            // act and expect no exception
+            await client.OpenAsync().ConfigureAwait(false);
+        }
+
         // Unfortunately, the way AmqpServiceClient is implemented, it makes mocking the required amqp types difficult
         // (the amqp types are private members of the class, and cannot be set from any public/ internal API).
         // For this reason the following test is tested in the E2E flow, even though this is a unit test scenario.
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task MessageIdDefaultNotSet_SendEventDoesNotSetMessageId()
         {
             // arrange
-            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, DevicePrefix).ConfigureAwait(false);
-            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString);
+            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(DevicePrefix).ConfigureAwait(false);
+            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString);
             string messageId = Guid.NewGuid().ToString();
 
             // act
@@ -112,16 +129,17 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
         // Unfortunately, the way AmqpServiceClient is implemented, it makes mocking the required amqp types difficult
         // (the amqp types are private members of the class, and cannot be set from any public/ internal API).
         // For this reason the following test is tested in the E2E flow, even though this is a unit test scenario.
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task MessageIdDefaultSetToNull_SendEventDoesNotSetMessageId()
         {
             // arrange
-            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, DevicePrefix).ConfigureAwait(false);
+            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(DevicePrefix).ConfigureAwait(false);
             var options = new ServiceClientOptions
             {
                 SdkAssignsMessageId = Shared.SdkAssignsMessageId.Never,
             };
-            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString, options);
+            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString, options);
             string messageId = Guid.NewGuid().ToString();
 
             // act
@@ -141,16 +159,17 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
         // Unfortunately, the way AmqpServiceClient is implemented, it makes mocking the required amqp types difficult
         // (the amqp types are private members of the class, and cannot be set from any public/ internal API).
         // For this reason the following test is tested in the E2E flow, even though this is a unit test scenario.
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task MessageIdDefaultSetToGuid_SendEventSetMessageIdIfNotSet()
         {
             // arrange
-            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, DevicePrefix).ConfigureAwait(false);
+            using TestDevice testDevice = await TestDevice.GetTestDeviceAsync(DevicePrefix).ConfigureAwait(false);
             var options = new ServiceClientOptions
             {
                 SdkAssignsMessageId = Shared.SdkAssignsMessageId.WhenUnset,
             };
-            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString, options);
+            using var sender = ServiceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString, options);
             string messageId = Guid.NewGuid().ToString();
 
             // act

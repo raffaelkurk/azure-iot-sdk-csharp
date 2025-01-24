@@ -13,8 +13,8 @@ jobs:
       matrix:
         .Net 6.0:
           FRAMEWORK: net6.0
-        .Net 5.0:
-          FRAMEWORK: net5.0
+        .Net 8.0:
+          FRAMEWORK: net8.0
         .Net Core 3.1:
           FRAMEWORK: netcoreapp3.1
         .Net Core 2.1.30:
@@ -41,10 +41,10 @@ jobs:
           installationPath: $(Agent.ToolsDirectory)/dotnet
 
       - task: UseDotNet@2
-        displayName: 'Use .NET SDK 5.0'
+        displayName: 'Use .NET SDK 8.0'
         inputs:
           packageType: sdk
-          version: 5.x
+          version: 8.x
           performMultiLevelLookup: true
           installationPath: $(Agent.ToolsDirectory)/dotnet
 
@@ -109,8 +109,6 @@ jobs:
           DPS_IDSCOPE: $(DPS-IDSCOPE)
           PROVISIONING_CONNECTION_STRING: $(PROVISIONING-CONNECTION-STRING)
           DPS_GLOBALDEVICEENDPOINT: $(DPS-GLOBALDEVICEENDPOINT)
-          FAR_AWAY_IOTHUB_HOSTNAME: $(FAR-AWAY-IOTHUB-HOSTNAME)
-          CUSTOM_ALLOCATION_POLICY_WEBHOOK: $(CUSTOM-ALLOCATION-POLICY-WEBHOOK)
           DPS_X509_PFX_CERTIFICATE_PASSWORD: $(DPS-X509-PFX-CERTIFICATE-PASSWORD)
           DPS_X509_GROUP_ENROLLMENT_NAME: $(DPS-X509-GROUP-ENROLLMENT-NAME)
 
@@ -160,7 +158,7 @@ jobs:
         displayName: 'Publish Test Results **/*.trx'
         inputs:
           testRunner: VSTest
-          testRunTitle: 'Linux Tests $(FRAMEWORK)'
+          testRunTitle: "Linux Tests ($(FRAMEWORK)) (Attempt $(System.JobAttempt))"
           testResultsFiles: '**/*.trx'
         condition: always()
 
@@ -174,16 +172,14 @@ jobs:
       matrix:
         .Net 6.0:
           FRAMEWORK: net6.0
-        .Net 5.0:
-          FRAMEWORK: net5.0
+        .Net 8.0:
+          FRAMEWORK: net8.0
         .Net Core 3.1:
           FRAMEWORK: netcoreapp3.1
         .Net Core 2.1.30:
           FRAMEWORK: netcoreapp2.1.30
         .Net Framework 4.7.2:
           FRAMEWORK: net472
-        .Net Framework 4.5.1:
-          FRAMEWORK: net451
 
     condition: succeeded()
     pool:
@@ -206,10 +202,10 @@ jobs:
           installationPath: $(Agent.ToolsDirectory)/dotnet
 
       - task: UseDotNet@2
-        displayName: 'Use .NET SDK 5.0'
+        displayName: 'Use .NET SDK 8.0'
         inputs:
           packageType: sdk
-          version: 5.x
+          version: 8.x
           performMultiLevelLookup: true
           installationPath: $(Agent.ToolsDirectory)/dotnet
 
@@ -258,8 +254,6 @@ jobs:
           DPS_IDSCOPE: $(DPS-IDSCOPE)
           PROVISIONING_CONNECTION_STRING: $(PROVISIONING-CONNECTION-STRING)
           DPS_GLOBALDEVICEENDPOINT: $(DPS-GLOBALDEVICEENDPOINT)
-          FAR_AWAY_IOTHUB_HOSTNAME: $(FAR-AWAY-IOTHUB-HOSTNAME)
-          CUSTOM_ALLOCATION_POLICY_WEBHOOK: $(CUSTOM-ALLOCATION-POLICY-WEBHOOK)
           DPS_X509_PFX_CERTIFICATE_PASSWORD: $(DPS-X509-PFX-CERTIFICATE-PASSWORD)
           DPS_X509_GROUP_ENROLLMENT_NAME: $(DPS-X509-GROUP-ENROLLMENT-NAME)
 
@@ -319,7 +313,7 @@ jobs:
         inputs:
           testRunner: VSTest
           testResultsFiles: '**/*.trx'
-          testRunTitle: 'Windows Tests $(FRAMEWORK)'
+          testRunTitle: "Windows Tests ($(FRAMEWORK)) (Attempt $(System.JobAttempt))"
           platform: Windows
           configuration: 'Debug UT + Release E2E ($(FRAMEWORK))'
         condition: always()

@@ -154,6 +154,29 @@ namespace Microsoft.Azure.Devices
             TokenCredential credential,
             HttpTransportSettings transportSettings = default)
         {
+            return Create(hostName, credential, CommonConstants.IotHubAadTokenScopes, transportSettings);
+        }
+
+        /// <summary>
+        /// Creates RegistryManager, authenticating using an identity in Azure Active Directory (AAD).
+        /// </summary>
+        /// <remarks>
+        /// For more about information on the options of authenticating using a derived instance of <see cref="TokenCredential"/>, see
+        /// <see href="https://docs.microsoft.com/dotnet/api/overview/azure/identity-readme"/>.
+        /// For more information on configuring IoT hub with Azure Active Directory, see
+        /// <see href="https://docs.microsoft.com/azure/iot-hub/iot-hub-dev-guide-azure-ad-rbac"/>
+        /// </remarks>
+        /// <param name="hostName">IoT hub host name.</param>
+        /// <param name="credential">Azure Active Directory (AAD) credentials to authenticate with IoT hub.</param>
+        /// <param name="transportSettings">The HTTP transport settings.</param>
+        /// <param name="scopes">The custom scopes to use when authenticating.</param>
+        /// <returns>A RegistryManager instance.</returns>
+        public static RegistryManager Create(
+            string hostName,
+            TokenCredential credential,
+            string[] scopes,
+            HttpTransportSettings transportSettings = default)
+        {
             if (string.IsNullOrEmpty(hostName))
             {
                 throw new ArgumentNullException($"{nameof(hostName)},  Parameter cannot be null or empty");
@@ -164,7 +187,7 @@ namespace Microsoft.Azure.Devices
                 throw new ArgumentNullException($"{nameof(credential)},  Parameter cannot be null");
             }
 
-            var tokenCredentialProperties = new IotHubTokenCrendentialProperties(hostName, credential);
+            var tokenCredentialProperties = new IotHubTokenCrendentialProperties(hostName, credential, scopes);
             return new RegistryManager(tokenCredentialProperties, transportSettings ?? new HttpTransportSettings());
         }
 
@@ -256,7 +279,7 @@ namespace Microsoft.Azure.Devices
         public virtual Task<Device> AddDeviceAsync(Device device, CancellationToken cancellationToken)
         {
             if (Logging.IsEnabled)
-                Logging.Enter(this, $"Adding device: {device?.Id}", nameof(AddDeviceAsync));
+                Logging.Enter(this, $"Adding device {device?.Id} with type {device?.Authentication?.Type}", nameof(AddDeviceAsync));
 
             try
             {
@@ -274,14 +297,15 @@ namespace Microsoft.Azure.Devices
                 NormalizeDevice(device);
 
                 var errorMappingOverrides = new Dictionary<HttpStatusCode, Func<HttpResponseMessage, Task<Exception>>>
-            {
                 {
-                    HttpStatusCode.PreconditionFailed,
-                    async responseMessage => new PreconditionFailedException(await ExceptionHandlingHelper
-                        .GetExceptionMessageAsync(responseMessage)
-                        .ConfigureAwait(false))
-                }
-            };
+                    {
+                        HttpStatusCode.PreconditionFailed,
+                        async responseMessage => new PreconditionFailedException(
+                            await ExceptionHandlingHelper
+                                .GetExceptionMessageAsync(responseMessage)
+                                .ConfigureAwait(false))
+                    }
+                };
 
                 return _httpClientHelper.PutAsync(GetRequestUri(device.Id), device, PutOperationType.CreateEntity, errorMappingOverrides, cancellationToken);
             }
@@ -294,7 +318,7 @@ namespace Microsoft.Azure.Devices
             finally
             {
                 if (Logging.IsEnabled)
-                    Logging.Exit(this, $"Adding device: {device?.Id}", nameof(AddDeviceAsync));
+                    Logging.Exit(this, $"Adding device {device?.Id}", nameof(AddDeviceAsync));
             }
         }
 
@@ -1936,7 +1960,7 @@ namespace Microsoft.Azure.Devices
                 }
 
                 // TODO: Do we need to deserialize Twin, only to serialize it again?
-                Twin twin = JsonConvert.DeserializeObject<Twin>(jsonTwinPatch);
+                Twin twin = JsonConvert.DeserializeObject<Twin>(jsonTwinPatch, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                 return UpdateTwinAsync(deviceId, twin, etag, cancellationToken);
             }
             catch (Exception ex)
@@ -2013,7 +2037,7 @@ namespace Microsoft.Azure.Devices
                 }
 
                 // TODO: Do we need to deserialize Twin, only to serialize it again?
-                Twin twin = JsonConvert.DeserializeObject<Twin>(jsonTwinPatch);
+                Twin twin = JsonConvert.DeserializeObject<Twin>(jsonTwinPatch, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                 return UpdateTwinAsync(deviceId, moduleId, twin, etag, cancellationToken);
             }
             catch (Exception ex)
@@ -2133,7 +2157,7 @@ namespace Microsoft.Azure.Devices
                 }
 
                 // TODO: Do we need to deserialize Twin, only to serialize it again?
-                Twin twin = JsonConvert.DeserializeObject<Twin>(newTwinJson);
+                Twin twin = JsonConvert.DeserializeObject<Twin>(newTwinJson, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                 return ReplaceTwinAsync(deviceId, twin, etag, cancellationToken);
             }
             catch (Exception ex)
@@ -2206,7 +2230,7 @@ namespace Microsoft.Azure.Devices
             }
 
             // TODO: Do we need to deserialize Twin, only to serialize it again?
-            Twin twin = JsonConvert.DeserializeObject<Twin>(newTwinJson);
+            Twin twin = JsonConvert.DeserializeObject<Twin>(newTwinJson, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
             return ReplaceTwinAsync(deviceId, moduleId, twin, etag, cancellationToken);
         }
 
@@ -2589,14 +2613,15 @@ namespace Microsoft.Azure.Devices
                 {
                     HttpStatusCode.NotFound,
                     async responseMessage =>
-                        {
-                            string responseContent = await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false);
-                            return new ConfigurationNotFoundException(responseContent, (Exception) null);
-                        }
+                    {
+                        string responseContent = await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false);
+                        return new ConfigurationNotFoundException(responseContent, (Exception) null);
+                    }
                 },
                 {
                     HttpStatusCode.PreconditionFailed,
-                    async responseMessage => new PreconditionFailedException(await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false))
+                    async responseMessage => new PreconditionFailedException(
+                        await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false))
                 }
             };
 
@@ -2623,11 +2648,13 @@ namespace Microsoft.Azure.Devices
             {
                 {
                     HttpStatusCode.PreconditionFailed,
-                    async responseMessage => new PreconditionFailedException(await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false))
+                    async responseMessage => new PreconditionFailedException(
+                        await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false))
                 },
                 {
                     HttpStatusCode.NotFound,
-                    async responseMessage => new DeviceNotFoundException(await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false), (Exception)null)
+                    async responseMessage => new DeviceNotFoundException(
+                        await ExceptionHandlingHelper.GetExceptionMessageAsync(responseMessage).ConfigureAwait(false), (Exception)null)
                 }
             };
 
@@ -2965,18 +2992,15 @@ namespace Microsoft.Azure.Devices
         private static void NormalizeDevice(Device device)
         {
             // auto generate keys if not specified
-            if (device.Authentication == null)
-            {
-                device.Authentication = new AuthenticationMechanism();
-            }
+            device.Authentication ??= new AuthenticationMechanism();
 
             NormalizeAuthenticationInfo(device.Authentication);
         }
 
         private static void NormalizeAuthenticationInfo(AuthenticationMechanism authenticationInfo)
         {
-            //to make it backward compatible we set the type according to the values
-            //we don't set CA type - that has to be explicit
+            // to make it backward compatible we set the type according to the values
+            // we don't set CA type - that has to be explicit
             if (authenticationInfo.SymmetricKey != null && !authenticationInfo.SymmetricKey.IsEmpty())
             {
                 authenticationInfo.Type = AuthenticationType.Sas;
@@ -2991,10 +3015,7 @@ namespace Microsoft.Azure.Devices
         private static void NormalizeExportImportDevice(ExportImportDevice device)
         {
             // auto generate keys if not specified
-            if (device.Authentication == null)
-            {
-                device.Authentication = new AuthenticationMechanism();
-            }
+            device.Authentication ??= new AuthenticationMechanism();
 
             NormalizeAuthenticationInfo(device.Authentication);
         }

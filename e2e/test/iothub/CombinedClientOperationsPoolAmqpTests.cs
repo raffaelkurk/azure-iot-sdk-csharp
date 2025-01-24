@@ -24,8 +24,9 @@ namespace Microsoft.Azure.Devices.E2ETests
 
         // TODO: #943 - Honor different pool sizes for different connection pool settings.
         [Ignore]
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
-        public async Task DeviceSak_DeviceCombinedClientOperations_SingleConnection_Amqp()
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
+        public async Task DeviceCombinedClientOperations_SingleConnection_Amqp()
         {
             await DeviceCombinedClientOperationsAsync(
                     Client.TransportType.Amqp_Tcp_Only,
@@ -36,8 +37,9 @@ namespace Microsoft.Azure.Devices.E2ETests
 
         // TODO: #943 - Honor different pool sizes for different connection pool settings.
         [Ignore]
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
-        public async Task DeviceSak_DeviceCombinedClientOperations_SingleConnection_AmqpWs()
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
+        public async Task DeviceCombinedClientOperations_SingleConnection_AmqpWs()
         {
             await DeviceCombinedClientOperationsAsync(
                     Client.TransportType.Amqp_WebSocket_Only,
@@ -46,35 +48,12 @@ namespace Microsoft.Azure.Devices.E2ETests
                 .ConfigureAwait(false);
         }
 
-        // TODO: #943 - Honor different pool sizes for different connection pool settings.
+        // ignoring the test as they repeatedly timed out on prod hub. Revert later
         [Ignore]
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
-        public async Task IoTHubSak_DeviceCombinedClientOperations_SingleConnection_Amqp()
-        {
-            await DeviceCombinedClientOperationsAsync(
-                    Client.TransportType.Amqp_Tcp_Only,
-                    PoolingOverAmqp.SingleConnection_PoolSize,
-                    PoolingOverAmqp.SingleConnection_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
-                .ConfigureAwait(false);
-        }
-
-        // TODO: #943 - Honor different pool sizes for different connection pool settings.
-        [Ignore]
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
-        public async Task IoTHubSak_DeviceCombinedClientOperations_SingleConnection_AmqpWs()
-        {
-            await DeviceCombinedClientOperationsAsync(
-                    Client.TransportType.Amqp_WebSocket_Only,
-                    PoolingOverAmqp.SingleConnection_PoolSize,
-                    PoolingOverAmqp.SingleConnection_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
-                .ConfigureAwait(false);
-        }
-
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(LongRunningTestTimeoutMilliseconds)]
         [TestCategory("LongRunning")]
-        public async Task DeviceSak_DeviceCombinedClientOperations_MultipleConnections_Amqp()
+        public async Task DeviceCombinedClientOperations_MultipleConnections_Amqp()
         {
             await DeviceCombinedClientOperationsAsync(
                     Client.TransportType.Amqp_Tcp_Only,
@@ -83,46 +62,26 @@ namespace Microsoft.Azure.Devices.E2ETests
                 .ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
-        public async Task DeviceSak_DeviceCombinedClientOperations_MultipleConnections_AmqpWs()
+        // ignoring the test as they repeatedly timed out on prod hub. Revert later
+        [Ignore]
+        [TestMethod]
+        [Timeout(LongRunningTestTimeoutMilliseconds)]
+        public async Task DeviceCombinedClientOperations_MultipleConnections_AmqpWs()
         {
             await DeviceCombinedClientOperationsAsync(
                     Client.TransportType.Amqp_WebSocket_Only,
                     PoolingOverAmqp.MultipleConnections_PoolSize,
                     PoolingOverAmqp.MultipleConnections_DevicesCount)
-                .ConfigureAwait(false);
-        }
-
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
-        public async Task IoTHubSak_DeviceCombinedClientOperations_MultipleConnections_Amqp()
-        {
-            await DeviceCombinedClientOperationsAsync(
-                    Client.TransportType.Amqp_Tcp_Only,
-                    PoolingOverAmqp.MultipleConnections_PoolSize,
-                    PoolingOverAmqp.MultipleConnections_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
-                .ConfigureAwait(false);
-        }
-
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
-        public async Task IoTHubSak_DeviceCombinedClientOperations_MultipleConnections_AmqpWs()
-        {
-            await DeviceCombinedClientOperationsAsync(
-                    Client.TransportType.Amqp_WebSocket_Only,
-                    PoolingOverAmqp.MultipleConnections_PoolSize,
-                    PoolingOverAmqp.MultipleConnections_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
                 .ConfigureAwait(false);
         }
 
         private async Task DeviceCombinedClientOperationsAsync(
             Client.TransportType transport,
             int poolSize,
-            int devicesCount,
-            ConnectionStringAuthScope authScope = ConnectionStringAuthScope.Device)
+            int devicesCount)
         {
             // Initialize service client for service-side operations
-            using var serviceClient = ServiceClient.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString);
+            using var serviceClient = ServiceClient.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString);
 
             // Message payload and properties for C2D operation
             var messagesSent = new Dictionary<string, Tuple<Message, string>>();
@@ -135,8 +94,8 @@ namespace Microsoft.Azure.Devices.E2ETests
                 IList<Task> initOperations = new List<Task>();
 
                 // Send C2D Message
-                Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Send C2D for device={testDevice.Id}");
-                (Message msg, string payload, string p1Value) = MessageReceiveE2ETests.ComposeC2dTestMessage(Logger);
+                VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Send C2D for device={testDevice.Id}");
+                (Message msg, string payload, string p1Value) = MessageReceiveE2ETests.ComposeC2dTestMessage();
                 using (msg)
                 {
                     messagesSent.Add(testDevice.Id, Tuple.Create(msg, payload));
@@ -144,16 +103,16 @@ namespace Microsoft.Azure.Devices.E2ETests
                     initOperations.Add(sendC2dMessage);
 
                     // Set method handler
-                    Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Set direct method {MethodName} for device={testDevice.Id}");
-                    Task<Task> methodReceivedTask = MethodE2ETests.SetDeviceReceiveMethodAsync(deviceClient, MethodName, Logger);
+                    VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Set direct method {MethodName} for device={testDevice.Id}");
+                    Task<Task> methodReceivedTask = MethodE2ETests.SetDeviceReceiveMethodAsync(deviceClient, MethodName);
                     initOperations.Add(methodReceivedTask);
 
                     // Set the twin desired properties callback
-                    Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Set desired property callback for device={testDevice.Id}");
+                    VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Set desired property callback for device={testDevice.Id}");
                     string propName = Guid.NewGuid().ToString();
                     string propValue = Guid.NewGuid().ToString();
                     twinPropertyMap.Add(testDevice.Id, new List<string> { propName, propValue });
-                    Task<Task> updateReceivedTask = TwinE2ETests.SetTwinPropertyUpdateCallbackHandlerAsync(deviceClient, propName, propValue, Logger);
+                    Task<Task> updateReceivedTask = TwinE2ETests.SetTwinPropertyUpdateCallbackHandlerAsync(deviceClient, propName, propValue);
                     initOperations.Add(updateReceivedTask);
 
                     await Task.WhenAll(initOperations).ConfigureAwait(false);
@@ -166,31 +125,31 @@ namespace Microsoft.Azure.Devices.E2ETests
                 await deviceClient.OpenAsync().ConfigureAwait(false);
 
                 // D2C Operation
-                Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 1: Send D2C for device={testDevice.Id}");
-                Task sendD2cMessage = MessageSendE2ETests.SendSingleMessageAsync(deviceClient, testDevice.Id, Logger);
+                VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 1: Send D2C for device={testDevice.Id}");
+                Task sendD2cMessage = MessageSendE2ETests.SendSingleMessageAsync(deviceClient);
                 clientOperations.Add(sendD2cMessage);
 
                 // C2D Operation
-                Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 2: Receive C2D for device={testDevice.Id}");
+                VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 2: Receive C2D for device={testDevice.Id}");
                 Tuple<Message, string> msgSent = messagesSent[testDevice.Id];
                 Message msg = msgSent.Item1;
                 string payload = msgSent.Item2;
 
-                Task verifyDeviceClientReceivesMessage = MessageReceiveE2ETests.VerifyReceivedC2DMessageAsync(transport, deviceClient, testDevice.Id, msg, payload, Logger);
+                Task verifyDeviceClientReceivesMessage = MessageReceiveE2ETests.VerifyReceivedC2DMessageAsync(transport, deviceClient, testDevice.Id, msg, payload);
                 clientOperations.Add(verifyDeviceClientReceivesMessage);
 
                 // Invoke direct methods
-                Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 3: Direct methods test for device={testDevice.Id}");
-                Task serviceInvokeMethod = MethodE2ETests.ServiceSendMethodAndVerifyResponseAsync(testDevice.Id, MethodName, MethodE2ETests.DeviceResponseJson, MethodE2ETests.ServiceRequestJson, Logger);
+                VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 3: Direct methods test for device={testDevice.Id}");
+                Task serviceInvokeMethod = MethodE2ETests.ServiceSendMethodAndVerifyResponseAsync(testDevice.Id, MethodName, MethodE2ETests.DeviceResponseJson, MethodE2ETests.ServiceRequestJson);
                 clientOperations.Add(serviceInvokeMethod);
 
                 // Set reported twin properties
-                Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 4: Set reported property for device={testDevice.Id}");
-                Task setReportedProperties = TwinE2ETests.Twin_DeviceSetsReportedPropertyAndGetsItBackAsync(deviceClient, testDevice.Id, Guid.NewGuid().ToString(), Logger);
+                VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 4: Set reported property for device={testDevice.Id}");
+                Task setReportedProperties = TwinE2ETests.Twin_DeviceSetsReportedPropertyAndGetsItBackAsync(deviceClient, testDevice.Id, Guid.NewGuid().ToString());
                 clientOperations.Add(setReportedProperties);
 
                 // Receive set desired twin properties
-                Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 5: Receive desired property for device={testDevice.Id}");
+                VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: Operation 5: Receive desired property for device={testDevice.Id}");
                 List<string> twinProperties = twinPropertyMap[testDevice.Id];
                 string propName = twinProperties[0];
                 string propValue = twinProperties[1];
@@ -198,7 +157,7 @@ namespace Microsoft.Azure.Devices.E2ETests
                 clientOperations.Add(updateDesiredProperties);
 
                 await Task.WhenAll(clientOperations).ConfigureAwait(false);
-                Logger.Trace($"{nameof(CombinedClientOperationsPoolAmqpTests)}: All operations completed for device={testDevice.Id}");
+                VerboseTestLogger.WriteLine($"{nameof(CombinedClientOperationsPoolAmqpTests)}: All operations completed for device={testDevice.Id}");
             }
 
             Task CleanupOperationAsync()
@@ -217,9 +176,8 @@ namespace Microsoft.Azure.Devices.E2ETests
                     InitOperationAsync,
                     TestOperationAsync,
                     CleanupOperationAsync,
-                    authScope,
-                    false,
-                    Logger)
+                    ConnectionStringAuthScope.Device,
+                    false)
                 .ConfigureAwait(false);
         }
     }

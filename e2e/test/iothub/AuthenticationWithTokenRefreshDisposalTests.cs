@@ -22,61 +22,71 @@ namespace Microsoft.Azure.Devices.E2ETests
         public static readonly TimeSpan MaxWaitTime = TimeSpan.FromSeconds(10);
         private readonly string _devicePrefix = $"{nameof(AuthenticationWithTokenRefreshDisposalTests)}_";
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceSak_ReusableAuthenticationMethod_SingleDevicePerConnection_Amqp()
         {
             await ReuseAuthenticationMethod_SingleDevice(Client.TransportType.Amqp_Tcp_Only).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceSak_ReusableAuthenticationMethod_SingleDevicePerConnection_AmqpWs()
         {
             await ReuseAuthenticationMethod_SingleDevice(Client.TransportType.Amqp_WebSocket_Only).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceSak_ReusableAuthenticationMethod_SingleDevicePerConnection_Mqtt()
         {
             await ReuseAuthenticationMethod_SingleDevice(Client.TransportType.Mqtt_Tcp_Only).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceSak_ReusableAuthenticationMethod_SingleDevicePerConnection_MqttWs()
         {
             await ReuseAuthenticationMethod_SingleDevice(Client.TransportType.Mqtt_WebSocket_Only).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceSak_ReusableAuthenticationMethod_SingleDevicePerConnection_Http()
         {
             await ReuseAuthenticationMethod_SingleDevice(Client.TransportType.Http1).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceSak_ReusableAuthenticationMethod_MuxedDevicesPerConnection_Amqp()
         {
             await ReuseAuthenticationMethod_MuxedDevices(Client.TransportType.Amqp_Tcp_Only, 2).ConfigureAwait(false); ;
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceSak_ReusableAuthenticationMethod_MuxedDevicesPerConnection_AmqpWs()
         {
             await ReuseAuthenticationMethod_MuxedDevices(Client.TransportType.Amqp_WebSocket_Only, 2).ConfigureAwait(false); ;
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_AuthenticationMethodDisposesTokenRefresher_Http()
         {
             await AuthenticationMethodDisposesTokenRefresher(Client.TransportType.Http1).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_AuthenticationMethodDisposesTokenRefresher_Amqp()
         {
             await AuthenticationMethodDisposesTokenRefresher(Client.TransportType.Amqp_Tcp_Only).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_AuthenticationMethodDisposesTokenRefresher_AmqpWs()
         {
             await AuthenticationMethodDisposesTokenRefresher(Client.TransportType.Amqp_WebSocket_Only).ConfigureAwait(false);
@@ -87,13 +97,15 @@ namespace Microsoft.Azure.Devices.E2ETests
         // This is not an issue when the communication is over websockets (where we use the sdk's websocket implementation).
         // This test has been ignored until we root-cause the issue on DotNetty's TCP stack.
         [Ignore]
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_AuthenticationMethodDisposesTokenRefresher_Mqtt()
         {
             await AuthenticationMethodDisposesTokenRefresher(Client.TransportType.Mqtt_Tcp_Only).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(TestTimeoutMilliseconds)]
         public async Task DeviceClient_AuthenticationMethodDisposesTokenRefresher_MqttWs()
         {
             await AuthenticationMethodDisposesTokenRefresher(Client.TransportType.Mqtt_WebSocket_Only).ConfigureAwait(false);
@@ -101,21 +113,21 @@ namespace Microsoft.Azure.Devices.E2ETests
 
         private async Task AuthenticationMethodDisposesTokenRefresher(Client.TransportType transport)
         {
-            TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, _devicePrefix).ConfigureAwait(false);
+            TestDevice testDevice = await TestDevice.GetTestDeviceAsync(_devicePrefix).ConfigureAwait(false);
             var authenticationMethod = new DeviceAuthenticationSasToken(testDevice.ConnectionString, disposeWithClient: true);
 
             // Create an instance of the device client, send a test message and then close and dispose it.
-            var deviceClient = DeviceClient.Create(testDevice.IotHubHostName, authenticationMethod, transport);
+            var deviceClient = DeviceClient.Create(TestDevice.IotHubHostName, authenticationMethod, transport);
             using var message1 = new Client.Message();
             await deviceClient.SendEventAsync(message1).ConfigureAwait(false);
             await deviceClient.CloseAsync();
             deviceClient.Dispose();
-            Logger.Trace("Test with instance 1 completed");
+            VerboseTestLogger.WriteLine("Test with instance 1 completed");
 
             // Perform the same steps again, reusing the previously created authentication method instance.
             // Since the default behavior is to dispose AuthenticationWithTokenRefresh authentication method on DeviceClient disposal,
             // this should now throw an ObjectDisposedException.
-            var deviceClient2 = DeviceClient.Create(testDevice.IotHubHostName, authenticationMethod, transport);
+            var deviceClient2 = DeviceClient.Create(TestDevice.IotHubHostName, authenticationMethod, transport);
             using var message2 = new Client.Message();
 
             Func<Task> act = async () => await deviceClient2.SendEventAsync(message2).ConfigureAwait(false);
@@ -127,25 +139,25 @@ namespace Microsoft.Azure.Devices.E2ETests
 
         private async Task ReuseAuthenticationMethod_SingleDevice(Client.TransportType transport)
         {
-            TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, _devicePrefix).ConfigureAwait(false);
+            TestDevice testDevice = await TestDevice.GetTestDeviceAsync(_devicePrefix).ConfigureAwait(false);
             var authenticationMethod = new DeviceAuthenticationSasToken(testDevice.ConnectionString, disposeWithClient: false);
 
             // Create an instance of the device client, send a test message and then close and dispose it.
-            var deviceClient = DeviceClient.Create(testDevice.IotHubHostName, authenticationMethod, transport);
+            var deviceClient = DeviceClient.Create(TestDevice.IotHubHostName, authenticationMethod, transport);
             using var message1 = new Client.Message();
             await deviceClient.SendEventAsync(message1).ConfigureAwait(false);
             await deviceClient.CloseAsync();
             deviceClient.Dispose();
-            Logger.Trace("Test with instance 1 completed");
+            VerboseTestLogger.WriteLine("Test with instance 1 completed");
 
             // Perform the same steps again, reusing the previously created authentication method instance to ensure
             // that the SDK did not dispose the user supplied authentication method instance.
-            var deviceClient2 = DeviceClient.Create(testDevice.IotHubHostName, authenticationMethod, transport);
+            var deviceClient2 = DeviceClient.Create(TestDevice.IotHubHostName, authenticationMethod, transport);
             using var message2 = new Client.Message();
             await deviceClient2.SendEventAsync(message2).ConfigureAwait(false);
             await deviceClient2.CloseAsync();
             deviceClient2.Dispose();
-            Logger.Trace("Test with instance 2 completed, reused the previously created authentication method instance for the device client.");
+            VerboseTestLogger.WriteLine("Test with instance 2 completed, reused the previously created authentication method instance for the device client.");
 
             authenticationMethod.Dispose();
         }
@@ -169,7 +181,7 @@ namespace Microsoft.Azure.Devices.E2ETests
 
             for (int i = 0; i < devicesCount; i++)
             {
-                TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, _devicePrefix).ConfigureAwait(false);
+                TestDevice testDevice = await TestDevice.GetTestDeviceAsync(_devicePrefix).ConfigureAwait(false);
 #pragma warning disable CA2000 // Dispose objects before losing scope - the authentication method is disposed at the end of the test.
                 var authenticationMethod = new DeviceAuthenticationSasToken(testDevice.ConnectionString, disposeWithClient: false);
 #pragma warning restore CA2000 // Dispose objects before losing scope
@@ -182,10 +194,10 @@ namespace Microsoft.Azure.Devices.E2ETests
             for (int i = 0; i < devicesCount; i++)
             {
 #pragma warning disable CA2000 // Dispose objects before losing scope - the client instance is disposed during the course of the test.
-                var deviceClient = DeviceClient.Create(testDevices[i].IotHubHostName, authenticationMethods[i], new ITransportSettings[] { amqpTransportSettings });
+                var deviceClient = DeviceClient.Create(TestDevice.IotHubHostName, authenticationMethods[i], new ITransportSettings[] { amqpTransportSettings });
 #pragma warning restore CA2000 // Dispose objects before losing scope
 
-                var amqpConnectionStatusChange = new AmqpConnectionStatusChange(testDevices[i].Id, Logger);
+                var amqpConnectionStatusChange = new AmqpConnectionStatusChange(testDevices[i].Id);
                 deviceClient.SetConnectionStatusChangesHandler(amqpConnectionStatusChange.ConnectionStatusChangesHandler);
                 amqpConnectionStatuses.Add(amqpConnectionStatusChange);
 
@@ -203,7 +215,7 @@ namespace Microsoft.Azure.Devices.E2ETests
 
             amqpConnectionStatuses[0].LastConnectionStatus.Should().Be(ConnectionStatus.Disabled);
 
-            Logger.Trace($"{nameof(ReuseAuthenticationMethod_MuxedDevices)}: Confirming the rest of the multiplexed devices are online and operational.");
+            VerboseTestLogger.WriteLine($"{nameof(ReuseAuthenticationMethod_MuxedDevices)}: Confirming the rest of the multiplexed devices are online and operational.");
 
             bool notRecovered = true;
             var sw = Stopwatch.StartNew();
@@ -228,7 +240,7 @@ namespace Microsoft.Azure.Devices.E2ETests
             for (int i = 1; i < devicesCount; i++)
             {
                 await deviceClients[i].SendEventAsync(message).ConfigureAwait(false);
-                Logger.Trace($"Test with client {i} completed.");
+                VerboseTestLogger.WriteLine($"Test with client {i} completed.");
             }
             message.Dispose();
 
@@ -247,7 +259,7 @@ namespace Microsoft.Azure.Devices.E2ETests
             {
 #pragma warning disable CA2000 // Dispose objects before losing scope - the client instance is disposed at the end of the test.
                 var deviceClient = DeviceClient.Create(
-                    testDevices[i].IotHubHostName,
+                    TestDevice.IotHubHostName,
                     authenticationMethods[i],
                     new ITransportSettings[]
                     {
@@ -255,7 +267,7 @@ namespace Microsoft.Azure.Devices.E2ETests
                     });
 #pragma warning restore CA2000 // Dispose objects before losing scope
 
-                var amqpConnectionStatusChange = new AmqpConnectionStatusChange(testDevices[i].Id, Logger);
+                var amqpConnectionStatusChange = new AmqpConnectionStatusChange(testDevices[i].Id);
                 deviceClient.SetConnectionStatusChangesHandler(amqpConnectionStatusChange.ConnectionStatusChangesHandler);
                 amqpConnectionStatuses.Add(amqpConnectionStatusChange);
 

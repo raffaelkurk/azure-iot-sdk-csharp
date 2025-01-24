@@ -22,7 +22,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
         // https://github.com/Azure/azure-sdk-for-net/issues/10476
 
         private const string ExportFileNameDefault = "devices.txt";
-        private const int MaxIterationWait = 60;
+        private const int MaxIterationWait = 180;
         private static readonly TimeSpan s_waitDuration = TimeSpan.FromSeconds(3);
 
         private static readonly char[] s_newlines = new char[]
@@ -31,7 +31,9 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             '\n',
         };
 
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
+        [Ignore("Test infrastructure doesn't currently support this test")]
+        [TestMethodWithRetry(Max = 3)]
+        [Timeout(LongRunningTestTimeoutMilliseconds)]
         [TestCategory("LongRunning")]
         [DoNotParallelize] // the number of jobs that can be run at a time are limited anyway
         [DataRow(StorageAuthenticationType.KeyBased, false)]
@@ -47,12 +49,12 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             string edgeId2 = $"{idPrefix}-Edge-{StorageContainer.GetRandomSuffix(4)}";
             string deviceId = $"{idPrefix}-{StorageContainer.GetRandomSuffix(4)}";
             string configurationId = (idPrefix + Guid.NewGuid()).ToLower(); // Configuration Id characters must be all lower-case.
-            Logger.Trace($"Using Ids {deviceId}, {edgeId1}, {edgeId2}, and {configurationId}");
+            VerboseTestLogger.WriteLine($"Using Ids {deviceId}, {edgeId1}, {edgeId2}, and {configurationId}");
 
             string devicesFileName = $"{idPrefix}-devicesexport-{StorageContainer.GetRandomSuffix(4)}.txt";
             string configsFileName = $"{idPrefix}-configsexport-{StorageContainer.GetRandomSuffix(4)}.txt";
 
-            using RegistryManager registryManager = RegistryManager.CreateFromConnectionString(TestConfiguration.IoTHub.ConnectionString);
+            using RegistryManager registryManager = RegistryManager.CreateFromConnectionString(TestConfiguration.IotHub.ConnectionString);
 
             try
             {
@@ -60,7 +62,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
                 using StorageContainer storageContainer = await StorageContainer
                     .GetInstanceAsync(containerName)
                     .ConfigureAwait(false);
-                Logger.Trace($"Using container {storageContainer.Uri}");
+                VerboseTestLogger.WriteLine($"Using container {storageContainer.Uri}");
 
                 Uri containerUri = storageAuthenticationType == StorageAuthenticationType.KeyBased
                     ? storageContainer.SasUri
@@ -100,7 +102,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
                         {
                             Priority = 2,
                             Labels = { { "labelName", "labelValue" } },
-                            TargetCondition = "*",
+                            TargetCondition = "deviceId='fakeDevice'",
                             Content =
                             {
                                 DeviceContent = { { "properties.desired.x", 4L } },
@@ -158,7 +160,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             ManagedIdentity identity = isUserAssignedMsi
                 ? new ManagedIdentity
                 {
-                    UserAssignedIdentity = TestConfiguration.IoTHub.UserAssignedMsiResourceId
+                    UserAssignedIdentity = TestConfiguration.IotHub.UserAssignedMsiResourceId
                 }
                 : null;
 
@@ -180,21 +182,21 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
                     jobProperties = await registryManager.ExportDevicesAsync(jobProperties).ConfigureAwait(false);
                     if (!string.IsNullOrWhiteSpace(jobProperties.FailureReason))
                     {
-                        Logger.Trace($"Job failed due to {jobProperties.FailureReason}");
+                        VerboseTestLogger.WriteLine($"Job failed due to {jobProperties.FailureReason}");
                     }
                     break;
                 }
                 // Concurrent jobs can be rejected, so implement a retry mechanism to handle conflicts with other tests
                 catch (JobQuotaExceededException)
                 {
-                    Logger.Trace($"JobQuotaExceededException... waiting after {sw.Elapsed}.");
+                    VerboseTestLogger.WriteLine($"JobQuotaExceededException... waiting after {sw.Elapsed}.");
                     await Task.Delay(s_waitDuration).ConfigureAwait(false);
                     continue;
                 }
             }
 
             sw.Stop();
-            Logger.Trace($"Job started after {sw.Elapsed}.");
+            VerboseTestLogger.WriteLine($"Job started after {sw.Elapsed}.");
 
             sw.Restart();
 
@@ -202,7 +204,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             {
                 await Task.Delay(s_waitDuration).ConfigureAwait(false);
                 jobProperties = await registryManager.GetJobAsync(jobProperties.JobId).ConfigureAwait(false);
-                Logger.Trace($"Job {jobProperties.JobId} is {jobProperties.Status} with progress {jobProperties.Progress}% after {sw.Elapsed}.");
+                VerboseTestLogger.WriteLine($"Job {jobProperties.JobId} is {jobProperties.Status} with progress {jobProperties.Progress}% after {sw.Elapsed}.");
             }
 
             return jobProperties;
@@ -238,11 +240,11 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
                     break;
                 }
 
-                ExportImportDevice exportedDevice = JsonConvert.DeserializeObject<ExportImportDevice>(serializedDevice);
+                ExportImportDevice exportedDevice = JsonConvert.DeserializeObject<ExportImportDevice>(serializedDevice, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
 
                 if (StringComparer.Ordinal.Equals(exportedDevice.Id, edge1.Id) && exportedDevice.Capabilities.IotEdge)
                 {
-                    Logger.Trace($"Found edge1 in export as [{serializedDevice}]");
+                    VerboseTestLogger.WriteLine($"Found edge1 in export as [{serializedDevice}]");
                     foundEdge1InExport = true;
                     exportedDevice.DeviceScope.Should().Be(edge1.Scope, "Edges retain their own scope");
                     continue;
@@ -250,7 +252,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 
                 if (StringComparer.Ordinal.Equals(exportedDevice.Id, edge2.Id) && exportedDevice.Capabilities.IotEdge)
                 {
-                    Logger.Trace($"Found edge2 in export as [{serializedDevice}]");
+                    VerboseTestLogger.WriteLine($"Found edge2 in export as [{serializedDevice}]");
                     foundEdge2InExport = true;
                     exportedDevice.DeviceScope.Should().Be(edge2.Scope, "Edges retain their own scope");
                     continue;
@@ -258,7 +260,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 
                 if (StringComparer.Ordinal.Equals(exportedDevice.Id, device.Id))
                 {
-                    Logger.Trace($"Found device in export as [{serializedDevice}]");
+                    VerboseTestLogger.WriteLine($"Found device in export as [{serializedDevice}]");
                     foundDeviceInExport = true;
                     exportedDevice.DeviceScope.Should().Be(edge1.Scope);
                     continue;
@@ -280,10 +282,10 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             bool foundConfig = false;
             foreach (string serializedConfig in serializedConfigs)
             {
-                Configuration exportedConfig = JsonConvert.DeserializeObject<Configuration>(serializedConfig);
+                Configuration exportedConfig = JsonConvert.DeserializeObject<Configuration>(serializedConfig, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                 if (StringComparer.Ordinal.Equals(exportedConfig.Id, configuration.Id))
                 {
-                    Logger.Trace($"Found config in export as [{serializedConfig}]");
+                    VerboseTestLogger.WriteLine($"Found config in export as [{serializedConfig}]");
                     foundConfig = true;
                 }
             }
@@ -310,7 +312,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             }
             catch (Exception ex)
             {
-                Logger.Trace($"Failed to remove device {deviceId} during cleanup due to {ex.Message}");
+                VerboseTestLogger.WriteLine($"Failed to remove device {deviceId} during cleanup due to {ex.Message}");
             }
 
             try
@@ -319,7 +321,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             }
             catch (Exception ex)
             {
-                Logger.Trace($"Failed to remove device {deviceId} during cleanup due to {ex.Message}");
+                VerboseTestLogger.WriteLine($"Failed to remove device {deviceId} during cleanup due to {ex.Message}");
             }
 
             try
@@ -328,7 +330,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             }
             catch (Exception ex)
             {
-                Logger.Trace($"Failed to remove device {deviceId} during cleanup due to {ex.Message}");
+                VerboseTestLogger.WriteLine($"Failed to remove device {deviceId} during cleanup due to {ex.Message}");
             }
 
             try
@@ -337,7 +339,7 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             }
             catch (Exception ex)
             {
-                Logger.Trace($"Failed to remove config {configurationId} during cleanup due to {ex.Message}");
+                VerboseTestLogger.WriteLine($"Failed to remove config {configurationId} during cleanup due to {ex.Message}");
             }
         }
     }

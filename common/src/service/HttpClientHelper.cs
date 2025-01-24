@@ -10,14 +10,15 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.Amqp.Transport;
 using Microsoft.Azure.Devices.Common;
 using Microsoft.Azure.Devices.Common.Exceptions;
 using Microsoft.Azure.Devices.Common.Extensions;
 using Microsoft.Azure.Devices.Shared;
 using Newtonsoft.Json;
-
 using static Microsoft.Azure.Devices.Shared.HttpMessageHelper;
 
 namespace Microsoft.Azure.Devices
@@ -307,12 +308,8 @@ namespace Microsoft.Azure.Devices
                 return (T)(object)message;
             }
 
-#if NET451
-            T entity = await message.Content.ReadAsAsync<T>(token).ConfigureAwait(false);
-#else
             string str = await message.Content.ReadHttpContentAsStringAsync(token).ConfigureAwait(false);
-            T entity = JsonConvert.DeserializeObject<T>(str);
-#endif
+            T entity = JsonConvert.DeserializeObject<T>(str, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
 
             // Etag in the header is considered authoritative
             var eTagHolder = entity as IETagHolder;
@@ -575,7 +572,7 @@ namespace Microsoft.Azure.Devices
                     }
                     else
                     {
-                        string str = JsonConvert.SerializeObject(entity);
+                        string str = JsonConvert.SerializeObject(entity, JsonSerializerSettingsInitializer.GetJsonSerializerSettings());
                         requestMsg.Content = new StringContent(str, System.Text.Encoding.UTF8, ApplicationJson);
                     }
                 }
@@ -747,7 +744,8 @@ namespace Microsoft.Azure.Devices
             IDictionary<HttpStatusCode, Func<HttpResponseMessage, Task<Exception>>> errorMappingOverrides,
             CancellationToken cancellationToken)
         {
-            Logging.Enter(this, httpMethod.Method, requestUri, nameof(ExecuteAsync));
+            if (Logging.IsEnabled)
+                Logging.Enter(this, httpMethod.Method, requestUri, nameof(ExecuteAsync));
 
             try
             {
@@ -782,7 +780,8 @@ namespace Microsoft.Azure.Devices
                 }
                 catch (AggregateException ex)
                 {
-                    Logging.Error(this, ex, nameof(ExecuteAsync));
+                    if (Logging.IsEnabled)
+                        Logging.Error(this, ex, nameof(ExecuteAsync));
 
                     ReadOnlyCollection<Exception> innerExceptions = ex.Flatten().InnerExceptions;
                     if (innerExceptions.Any(Fx.IsFatal))
@@ -801,25 +800,29 @@ namespace Microsoft.Azure.Devices
                 }
                 catch (TimeoutException ex)
                 {
-                    Logging.Error(this, ex, nameof(ExecuteAsync));
+                    if (Logging.IsEnabled)
+                        Logging.Error(this, ex, nameof(ExecuteAsync));
 
                     throw new IotHubCommunicationException(ex.Message, ex);
                 }
                 catch (IOException ex)
                 {
-                    Logging.Error(this, ex, nameof(ExecuteAsync));
+                    if (Logging.IsEnabled)
+                        Logging.Error(this, ex, nameof(ExecuteAsync));
 
                     throw new IotHubCommunicationException(ex.Message, ex);
                 }
                 catch (HttpRequestException ex)
                 {
-                    Logging.Error(this, ex, nameof(ExecuteAsync));
+                    if (Logging.IsEnabled)
+                        Logging.Error(this, ex, nameof(ExecuteAsync));
 
                     throw new IotHubCommunicationException(ex.Message, ex);
                 }
                 catch (TaskCanceledException ex)
                 {
-                    Logging.Error(this, ex, nameof(ExecuteAsync));
+                    if (Logging.IsEnabled)
+                        Logging.Error(this, ex, nameof(ExecuteAsync));
 
                     // Unfortunately TaskCanceledException is thrown when HttpClient times out.
                     if (cancellationToken.IsCancellationRequested)
@@ -831,7 +834,8 @@ namespace Microsoft.Azure.Devices
                 }
                 catch (Exception ex) when (!Fx.IsFatal(ex))
                 {
-                    Logging.Error(this, ex, nameof(ExecuteAsync));
+                    if (Logging.IsEnabled)
+                        Logging.Error(this, ex, nameof(ExecuteAsync));
 
                     throw new IotHubException(ex.Message, ex);
                 }
@@ -844,7 +848,8 @@ namespace Microsoft.Azure.Devices
             }
             finally
             {
-                Logging.Exit(this, httpMethod.Method, requestUri, nameof(ExecuteAsync));
+                if (Logging.IsEnabled)
+                    Logging.Exit(this, httpMethod.Method, requestUri, nameof(ExecuteAsync));
             }
         }
 
@@ -879,25 +884,38 @@ namespace Microsoft.Azure.Devices
 
         internal static HttpMessageHandler CreateDefaultHttpMessageHandler(IWebProxy webProxy, Uri baseUri, int connectionLeaseTimeoutMilliseconds)
         {
-#pragma warning disable CA2000 // Dispose objects before losing scope (object is returned by this method, so the caller is responsible for disposing it)
-#if NETCOREAPP && !NETCOREAPP2_0 && !NETCOREAPP1_0 && !NETCOREAPP1_1
-            // SocketsHttpHandler is only available in netcoreapp2.1 and onwards
-            var httpMessageHandler = new SocketsHttpHandler();
-            httpMessageHandler.SslOptions.EnabledSslProtocols = TlsVersions.Instance.Preferred;
-#else
-            var httpMessageHandler = new HttpClientHandler();
-#if !NET451
-            httpMessageHandler.SslProtocols = TlsVersions.Instance.Preferred;
-            httpMessageHandler.CheckCertificateRevocationList = TlsVersions.Instance.CertificateRevocationCheck;
-#endif
-#endif
-#pragma warning restore CA2000 // Dispose objects before losing scope
+            HttpMessageHandler httpMessageHandler = null;
+
+#if NETCOREAPP2_1_OR_GREATER || NET5_0_OR_GREATER
+            var socketsHandler = new SocketsHttpHandler();
+            socketsHandler.SslOptions.EnabledSslProtocols = TlsVersions.Instance.Preferred;
+
+            if (!TlsVersions.Instance.CertificateRevocationCheck)
+            {
+                socketsHandler.SslOptions.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
+            }
 
             if (webProxy != DefaultWebProxySettings.Instance)
             {
-                httpMessageHandler.UseProxy = webProxy != null;
-                httpMessageHandler.Proxy = webProxy;
+                socketsHandler.UseProxy = webProxy != null;
+                socketsHandler.Proxy = webProxy;
             }
+
+            httpMessageHandler = socketsHandler;
+#else
+            var httpClientHandler = new HttpClientHandler();
+#if !NET451
+            httpClientHandler.SslProtocols = TlsVersions.Instance.Preferred;
+            httpClientHandler.CheckCertificateRevocationList = TlsVersions.Instance.CertificateRevocationCheck;
+#endif
+            if (webProxy != DefaultWebProxySettings.Instance)
+            {
+                httpClientHandler.UseProxy = webProxy != null;
+                httpClientHandler.Proxy = webProxy;
+            }
+
+            httpMessageHandler = httpClientHandler;
+#endif
 
             ServicePointHelpers.SetLimits(httpMessageHandler, baseUri, connectionLeaseTimeoutMilliseconds);
 

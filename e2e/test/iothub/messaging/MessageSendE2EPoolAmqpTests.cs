@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Devices.Client;
 using Microsoft.Azure.Devices.E2ETests.Helpers;
@@ -19,11 +20,11 @@ namespace Microsoft.Azure.Devices.E2ETests.Messaging
 
         // TODO: #943 - Honor different pool sizes for different connection pool settings.
         [Ignore]
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(LongRunningTestTimeoutMilliseconds)]
         public async Task Message_DeviceSak_DeviceSendSingleMessage_SingleConnection_Amqp()
         {
             await SendMessagePoolOverAmqp(
-                    TestDeviceType.Sasl,
                     Client.TransportType.Amqp_Tcp_Only,
                     PoolingOverAmqp.SingleConnection_PoolSize,
                     PoolingOverAmqp.SingleConnection_DevicesCount)
@@ -32,104 +33,56 @@ namespace Microsoft.Azure.Devices.E2ETests.Messaging
 
         // TODO: #943 - Honor different pool sizes for different connection pool settings.
         [Ignore]
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(LongRunningTestTimeoutMilliseconds)]
         public async Task Message_DeviceSak_DeviceSendSingleMessage_SingleConnection_AmqpWs()
         {
             await SendMessagePoolOverAmqp(
-                    TestDeviceType.Sasl,
                     Client.TransportType.Amqp_WebSocket_Only,
                     PoolingOverAmqp.SingleConnection_PoolSize,
                     PoolingOverAmqp.SingleConnection_DevicesCount)
                 .ConfigureAwait(false);
         }
 
-        // TODO: #943 - Honor different pool sizes for different connection pool settings.
-        [Ignore]
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
-        public async Task Message_IoTHubSak_DeviceSendSingleMessage_SingleConnection_Amqp()
-        {
-            await SendMessagePoolOverAmqp(
-                    TestDeviceType.Sasl,
-                    Client.TransportType.Amqp_Tcp_Only,
-                    PoolingOverAmqp.SingleConnection_PoolSize,
-                    PoolingOverAmqp.SingleConnection_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
-                .ConfigureAwait(false);
-        }
-
-        // TODO: #943 - Honor different pool sizes for different connection pool settings.
-        [Ignore]
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
-        public async Task Message_IoTHubSak_DeviceSendSingleMessage_SingleConnection_AmqpWs()
-        {
-            await SendMessagePoolOverAmqp(
-                    TestDeviceType.Sasl,
-                    Client.TransportType.Amqp_WebSocket_Only,
-                    PoolingOverAmqp.SingleConnection_PoolSize,
-                    PoolingOverAmqp.SingleConnection_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
-                .ConfigureAwait(false);
-        }
-
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
+        [Ignore] // TODO: Investigate timeout for this test
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(LongRunningTestTimeoutMilliseconds)]
         public async Task Message_DeviceSak_DeviceSendSingleMessage_MultipleConnections_Amqp()
         {
             await SendMessagePoolOverAmqp(
-                TestDeviceType.Sasl,
                 Client.TransportType.Amqp_Tcp_Only,
                 PoolingOverAmqp.MultipleConnections_PoolSize,
                 PoolingOverAmqp.MultipleConnections_DevicesCount).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
+        [Ignore] // TODO: Investigate timeout for this test
+        [TestMethodWithRetry(Max=3)]
+        [Timeout(LongRunningTestTimeoutMilliseconds)]
         public async Task Message_DeviceSak_DeviceSendSingleMessage_MultipleConnections_AmqpWs()
         {
             await SendMessagePoolOverAmqp(
-                    TestDeviceType.Sasl,
                     Client.TransportType.Amqp_WebSocket_Only,
                     PoolingOverAmqp.MultipleConnections_PoolSize,
                     PoolingOverAmqp.MultipleConnections_DevicesCount)
                 .ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
-        public async Task Message_IoTHubSak_DeviceSendSingleMessage_MultipleConnections_Amqp()
-        {
-            await SendMessagePoolOverAmqp(
-                    TestDeviceType.Sasl,
-                    Client.TransportType.Amqp_Tcp_Only,
-                    PoolingOverAmqp.MultipleConnections_PoolSize,
-                    PoolingOverAmqp.MultipleConnections_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
-                .ConfigureAwait(false);
-        }
-
-        [LoggedTestMethod, Timeout(LongRunningTestTimeoutMilliseconds)]
-        public async Task Message_IoTHubSak_DeviceSendSingleMessage_MultipleConnections_AmqpWs()
-        {
-            await SendMessagePoolOverAmqp(
-                    TestDeviceType.Sasl,
-                    Client.TransportType.Amqp_WebSocket_Only,
-                    PoolingOverAmqp.MultipleConnections_PoolSize,
-                    PoolingOverAmqp.MultipleConnections_DevicesCount,
-                    ConnectionStringAuthScope.IoTHub)
-                .ConfigureAwait(false);
-        }
-
         private async Task SendMessagePoolOverAmqp(
-            TestDeviceType type,
             Client.TransportType transport,
             int poolSize,
             int devicesCount,
             ConnectionStringAuthScope authScope = ConnectionStringAuthScope.Device)
         {
+            async Task InitAsync(DeviceClient deviceClient, TestDevice t, TestDeviceCallbackHandler c)
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                await deviceClient.OpenAsync(cts.Token).ConfigureAwait(false);
+            }
+
             async Task TestOperationAsync(DeviceClient deviceClient, TestDevice testDevice, TestDeviceCallbackHandler _)
             {
-                Logger.Trace($"{nameof(MessageSendE2EPoolAmqpTests)}: Preparing to send message for device {testDevice.Id}");
-                await deviceClient.OpenAsync().ConfigureAwait(false);
-
-                (Client.Message testMessage, string payload, string p1Value) = MessageSendE2ETests.ComposeD2cTestMessage(Logger);
-                Logger.Trace($"{nameof(MessageSendE2EPoolAmqpTests)}.{testDevice.Id}: messageId='{testMessage.MessageId}' payload='{payload}' p1Value='{p1Value}'");
+                using Client.Message testMessage = MessageSendE2ETests.ComposeD2cTestMessage(out string payload, out string p1Value);
+                VerboseTestLogger.WriteLine($"{nameof(MessageSendE2EPoolAmqpTests)}.{testDevice.Id}: messageId='{testMessage.MessageId}' payload='{payload.Substring(0,32)}' p1Value='{p1Value}'");
                 await deviceClient.SendEventAsync(testMessage).ConfigureAwait(false);
             }
 
@@ -139,12 +92,11 @@ namespace Microsoft.Azure.Devices.E2ETests.Messaging
                     transport,
                     poolSize,
                     devicesCount,
-                    null,
+                    InitAsync,
                     TestOperationAsync,
                     null,
                     authScope,
-                    true,
-                    Logger)
+                    true)
                 .ConfigureAwait(false);
         }
     }

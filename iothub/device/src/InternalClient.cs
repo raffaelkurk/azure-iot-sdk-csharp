@@ -123,6 +123,7 @@ namespace Microsoft.Azure.Devices.Client
         // Stores methods supported by the client device and their associated delegate.
 
         private bool _isDeviceMethodEnabled;
+
         private readonly Dictionary<string, Tuple<MethodCallback, object>> _deviceMethods =
             new Dictionary<string, Tuple<MethodCallback, object>>();
 
@@ -195,6 +196,8 @@ namespace Microsoft.Azure.Devices.Client
             if (Logging.IsEnabled)
                 Logging.Exit(this, transportSettings, pipelineBuilder, nameof(InternalClient) + "_ctor");
         }
+
+        internal bool IsDisposed { get; private set; }
 
         /// <summary>
         /// Diagnostic sampling percentage value, [0-100];
@@ -703,10 +706,7 @@ namespace Microsoft.Azure.Devices.Client
             {
                 foreach (Message message in messages)
                 {
-                    if (message.MessageId == null)
-                    {
-                        message.MessageId = Guid.NewGuid().ToString();
-                    }
+                    message.MessageId ??= Guid.NewGuid().ToString();
                 }
             }
 
@@ -1118,7 +1118,6 @@ namespace Microsoft.Azure.Devices.Client
         /// <returns>The device twin object for the current device</returns>
         public Task<Twin> GetTwinAsync(CancellationToken cancellationToken)
         {
-            // `GetTwinAsync` shall call `SendTwinGetAsync` on the transport to get the twin state.
             try
             {
                 return InnerHandler.SendTwinGetAsync(cancellationToken);
@@ -1377,6 +1376,11 @@ namespace Microsoft.Azure.Devices.Client
             FileUploadSasUriRequest request,
             CancellationToken cancellationToken = default)
         {
+            if (IsDisposed)
+            {
+                throw new ObjectDisposedException("IoT client", DefaultDelegatingHandler.ClientDisposedMessage);
+            }
+
             return _fileUploadHttpTransportHandler.GetFileUploadSasUriAsync(request, cancellationToken);
         }
 
@@ -1384,6 +1388,11 @@ namespace Microsoft.Azure.Devices.Client
             FileUploadCompletionNotification notification,
             CancellationToken cancellationToken = default)
         {
+            if (IsDisposed)
+            {
+                throw new ObjectDisposedException("IoT client", DefaultDelegatingHandler.ClientDisposedMessage);
+            }
+
             return _fileUploadHttpTransportHandler.CompleteFileUploadAsync(notification, cancellationToken);
         }
 
@@ -1412,10 +1421,15 @@ namespace Microsoft.Azure.Devices.Client
         [Obsolete("This API has been split into three APIs: GetFileUploadSasUri, uploading to blob directly using the Azure Storage SDK, and CompleteFileUploadAsync")]
         public Task UploadToBlobAsync(string blobName, Stream source, CancellationToken cancellationToken)
         {
+            if (Logging.IsEnabled)
+                Logging.Enter(this, blobName, source, nameof(UploadToBlobAsync));
+
             try
             {
-                if (Logging.IsEnabled)
-                    Logging.Enter(this, blobName, source, nameof(UploadToBlobAsync));
+                if (IsDisposed)
+                {
+                    throw new ObjectDisposedException("IoT client", DefaultDelegatingHandler.ClientDisposedMessage);
+                }
 
                 if (string.IsNullOrEmpty(blobName))
                 {
@@ -1498,7 +1512,7 @@ namespace Microsoft.Azure.Devices.Client
                     throw new ArgumentNullException(nameof(message));
                 }
 
-                message.SystemProperties.Add(MessageSystemPropertyNames.OutputName, outputName);
+                message.SystemProperties[MessageSystemPropertyNames.OutputName] = outputName;
 
                 return InnerHandler.SendEventAsync(message, cancellationToken);
             }
@@ -1556,7 +1570,7 @@ namespace Microsoft.Azure.Devices.Client
                     throw new ArgumentNullException(nameof(messages));
                 }
 
-                messagesList.ForEach(m => m.SystemProperties.Add(MessageSystemPropertyNames.OutputName, outputName));
+                messagesList.ForEach(m => m.SystemProperties[MessageSystemPropertyNames.OutputName] = outputName);
 
                 return InnerHandler.SendEventAsync(messagesList, cancellationToken);
             }
@@ -1631,11 +1645,7 @@ namespace Microsoft.Azure.Devices.Client
                     // When using a device module we need to enable the 'deviceBound' message link
                     await EnableEventReceiveAsync(isAnEdgeModule, cancellationToken).ConfigureAwait(false);
 
-                    if (_receiveEventEndpoints == null)
-                    {
-                        _receiveEventEndpoints = new Dictionary<string, Tuple<MessageHandler, object>>();
-                    }
-
+                    _receiveEventEndpoints ??= new Dictionary<string, Tuple<MessageHandler, object>>();
                     _receiveEventEndpoints[inputName] = new Tuple<MessageHandler, object>(messageHandler, userContext);
                 }
                 else
@@ -1833,6 +1843,7 @@ namespace Microsoft.Azure.Devices.Client
 
         public void Dispose()
         {
+            IsDisposed = true;
             InnerHandler?.Dispose();
             _methodsSemaphore?.Dispose();
             _moduleReceiveMessageSemaphore?.Dispose();

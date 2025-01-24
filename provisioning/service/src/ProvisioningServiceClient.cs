@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Devices.Common.Service.Auth;
+using Newtonsoft.Json;
 
 namespace Microsoft.Azure.Devices.Provisioning.Service
 {
@@ -40,7 +41,7 @@ namespace Microsoft.Azure.Devices.Provisioning.Service
     /// This C# SDK can be represented in the follow diagram, the first layer are the public APIs the your application
     /// shall use:
     ///
-    /// <c>
+    /// <code>
     /// +===============+       +==========================================+                           +============+   +===+
     /// |    configs    |------>|         ProvisioningServiceClient        |                        +->|    Query   |   |   |
     /// +===============+       +==+=================+==================+==+                        |  +======+=====+   | e |
@@ -60,7 +61,7 @@ namespace Microsoft.Azure.Devices.Provisioning.Service
     ///                        +-------------------------------------+------------------------------------------+
     ///                        |                              System.Net.Http                                   |
     ///                        +--------------------------------------------------------------------------------+
-    /// </c>
+    /// </code>
     /// </remarks>
     public class ProvisioningServiceClient : IDisposable
     {

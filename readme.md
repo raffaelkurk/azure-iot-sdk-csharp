@@ -25,15 +25,6 @@ To prepare for this change, make sure your device's certificate store has both o
 For a more in depth explanation as to why the IoT services are doing this, please see
 [this article](https://techcommunity.microsoft.com/t5/internet-of-things/azure-iot-tls-critical-changes-are-almost-here-and-why-you/ba-p/2393169).
 
-## Build status
-
-Due to security considerations, build logs are not publicly available.
-
-| Service Environment                                                   | Status                                                                                                                                                                                                                                                                                        |
-| ---                                                                   | ---                                                                                                                                                                                                                                                                                           |
-| [Main](https://github.com/Azure/azure-iot-sdk-csharp/tree/main)   | [![Build Status](https://azure-iot-sdks.visualstudio.com/azure-iot-sdks/_apis/build/status/csharp/CSharp%20Prod%20-%20West%20Central%20US?branchName=main)](https://azure-iot-sdks.visualstudio.com/azure-iot-sdks/_build/latest?definitionId=44&repositoryFilter=9&branchName=main)      |
-| [Preview](https://github.com/Azure/azure-iot-sdk-csharp/tree/preview) | [![Build Status](https://azure-iot-sdks.visualstudio.com/azure-iot-sdks/_apis/build/status/csharp/CSharp%20Canary%20-%20Central%20US%20EUAP?branchName=preview)](https://azure-iot-sdks.visualstudio.com/azure-iot-sdks/_build/latest?definitionId=402&repositoryFilter=9&branchName=preview) |
-
 ## Recommended NuGet packages
 
 | Package Name                                          | Release Version                                           |
@@ -47,8 +38,6 @@ Due to security considerations, build logs are not publicly available.
 | Microsoft.Azure.Devices.Provisioning.Transport.Mqtt   | [![NuGet][dps-device-mqtt-release]][dps-device-mqtt-nuget]|
 | Microsoft.Azure.Devices.Provisioning.Service          | [![NuGet][dps-service-release]][dps-service-nuget]        |
 | Microsoft.Azure.Devices.Provisioning.Security.Tpm     | [![NuGet][dps-tpm-release]][dps-tpm-nuget]                |
-| Microsoft.Azure.Devices.DigitalTwin.Client            | N/A                                                       |
-| Microsoft.Azure.Devices.DigitalTwin.Service           | N/A                                                       |
 
 > Note:  
 > 1. In addition to stable builds we also release pre-release builds that contain preview features. You can find details about the preview features released by looking at the [release notes](https://github.com/Azure/azure-iot-sdk-csharp/releases). It is not recommended to take dependency on preview NuGets for production applications as breaking changes can be introduced in preview packages.
@@ -66,22 +55,26 @@ The API reference documentation for .NET SDK is [here][dotnet-api-reference].
 To find SDKs in other languages for Azure IoT, please refer to the [azure-iot-sdks][azure-iot-sdks] repository.
 For IoT Hub Management SDK in .NET, please visit [azure-sdk-for-net](https://github.com/Azure/azure-sdk-for-net) repository.
 
-## Need support?
-
-- Have a feature request for SDKs? Please post it on [User Voice](https://feedback.azure.com/forums/321918-azure-iot) to help us prioritize.
-- Have a technical question? Ask on [Stack Overflow](https://stackoverflow.com/questions/tagged/azure-iot-hub) with tag “azure-iot-hub”.
-- Need Support? Every customer with an active Azure subscription has access to [support](https://docs.microsoft.com/azure/azure-supportability/how-to-create-azure-support-request) with guaranteed response time. Consider submitting a ticket and get assistance from Microsoft support team.
-- Found a bug? Please help us fix it by thoroughly documenting it and filing an issue on GitHub (C, Java, .NET, Node.js, Python).
-
 ## Developing applications for Azure IoT
 
 Visit [Azure IoT Dev Center][iot-dev-center] to learn more about developing applications for Azure IoT.
 
 ## Samples
 
-Most of our samples are available at [Azure IoT Samples for C#](https://github.com/Azure-Samples/azure-iot-samples-csharp).
+All of our samples are located in this repository. The samples live alongside the source for each client library.
 
-If you are looking for a good device sample to get started with, please see the [device reconnection sample](https://github.com/Azure-Samples/azure-iot-samples-csharp/tree/main/iot-hub/Samples/device/DeviceReconnectionSample).
+- [IoT hub device](https://github.com/Azure/azure-iot-sdk-csharp/tree/main/iothub/device/samples) samples
+- [IoT hub service](https://github.com/Azure/azure-iot-sdk-csharp/tree/main/iothub/service/samples) samples
+- [Provisioning device](https://github.com/Azure/azure-iot-sdk-csharp/tree/main/provisioning/device/samples) samples
+- [Provisioning service](https://github.com/Azure/azure-iot-sdk-csharp/tree/main/provisioning/service/samples) samples
+
+Samples for each of these categories are further separated into three sub-categories (from simplest to complex):
+
+1. `Getting Started`
+2. `How To Guides`
+3. `Solutions`
+
+If you are looking for a good device sample to get started with, please see the [device reconnection sample](https://github.com/Azure/azure-iot-sdk-csharp/tree/main/iothub/device/samples/how%20to%20guides/DeviceReconnectionSample).
 It shows how to connect a device, handle disconnect events, cases to handle when making calls, and when to re-initialize the `DeviceClient`.
 
 ## Contribute to the Azure IoT C# SDK
@@ -102,7 +95,7 @@ Note that you can configure your TLS protocol version and ciphers by following [
 
 | Features                                                                                                         | mqtt                | mqtt-ws             | amqp                | amqp-ws             | https               | Description                                                                                                                                                                                                                                                            |
 |------------------------------------------------------------------------------------------------------------------|---------------------|---------------------|---------------------|---------------------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [Authentication](https://docs.microsoft.com/azure/iot-hub/iot-hub-security-deployment)                     | :heavy_check_mark:  | :heavy_check_mark:* | :heavy_check_mark:  | :heavy_check_mark:* | :heavy_check_mark:* | Connect your device to IoT Hub securely with supported authentication, including private key, SASToken, X-509 Self Signed and X-509 CA Signed. </br> *IoT Hub only supports X-509 CA Signed over AMQP and MQTT at the moment.  X509-CA authentication over websocket and HTTPS are not supported. |
+| [Authentication](https://docs.microsoft.com/azure/iot-hub/iot-hub-security-deployment)                     | :heavy_check_mark:  | :heavy_check_mark:* | :heavy_check_mark:  | :heavy_check_mark:* | :heavy_check_mark:* | Connect your device to IoT Hub securely with supported authentication methods, including private key, shared access signature (SAS) token, X.509 self-signed, and X.509 certificate authority (CA) signed. </br> *IoT Hub only supports X.509 CA signed over AMQP and MQTT at the moment.  X.509 CA authentication over web socket and HTTPS are not supported. When authenticating a device using shared access key (SAK) over MQTT, new connection will be setup as part of the SAS token refresh process; device communication will be briefly closed during refresh (for details, see [device connection and messaging reliability documentation](https://github.com/Azure/azure-iot-sdk-csharp/blob/main/device_connection_and_reliability_readme.md)). X.509 certificate-based authentication process does not have the same refresh disruption. Also, X.509 certificate-based authentication is more secure than share access key authentication.|
 | [Send device-to-cloud message](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messages-d2c)     | :heavy_check_mark:* | :heavy_check_mark:* | :heavy_check_mark:  | :heavy_check_mark:  | :heavy_check_mark:  | Send device-to-cloud messages (max 256KB) to IoT Hub with the option to add application properties and system properties, and batch send. </br> *IoT Hub only supports batch send over AMQP and HTTPS at the moment. The MQTT implementation loops over the batch and sends each message individually. |
 | [Receive cloud-to-device messages](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messages-c2d) | :heavy_check_mark:* | :heavy_check_mark:* | :heavy_check_mark:  | :heavy_check_mark:  | :heavy_check_mark:  | Receive cloud-to-device messages and read associated application and system properties from IoT Hub, with the option to complete/reject/abandon C2D messages. </br> *IoT Hub does not support the option to reject/abandon C2D messages over MQTT at the moment. |
 | [Device Twins](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins)                     | :heavy_check_mark:* | :heavy_check_mark:* | :heavy_check_mark:* | :heavy_check_mark:* | :heavy_minus_sign:  | IoT Hub persists a device twin for each device that you connect to IoT Hub.  The device can perform operations like get twin tags, subscribe to desired properties. </br> *Send reported properties version and desired properties version are in progress. |
@@ -184,30 +177,22 @@ A couple of examples:
 
 For additional guidance and important information about certificates, please refer to [this blog post](https://techcommunity.microsoft.com/t5/internet-of-things/azure-iot-tls-changes-are-coming-and-why-you-should-care/ba-p/1658456) from the security team.
 
-## Long-Term Support (LTS)
+## Support
 
-The project offers a Long-Term Support (LTS) releases to allow users that do not need the latest features to be shielded from unwanted changes.
+The Azure IoT Hub Device Client supported releases is outlined in the following table.
 
-LTS repo tags are to be named lts_*yyyy*-*mm*-*dd*, where *yyyy*, *mm*, and *dd* are the year, month, and day when the tag was created. An example of such a tag is *lts_2021-03-18*.
+Refer to the [Azure IoT Device SDK lifecycle and support](https://learn.microsoft.com/azure/iot/iot-device-sdks-lifecycle-and-support) for details on the different supported stages.
 
-The lifetime of an LTS release is 12 months. During this time, LTS releases may receive maintenance bug fixes that fall in these categories:
+| Release | Category | End-of-life |
+|-|-|-|
+| [![NuGet][iothub-device-release]][iothub-device-nuget] | Active | - |
 
-- security bug fixes
-- critical bug fixes (e.g., unavoidable/unrecoverable crashes, significant memory leaks)
+### Need help?
 
-> No new features or improvements are in scope to be picked up in an LTS branch. A patch will not extend the maintenance or expiry date.
-
-LTS releases may include additional extended support for security bug fixes as listed in the LTS schedule.
-
-### Schedule
-
-This table shows previous LTS releases and end dates.
-
-| Release                                                                                                                        | LTS Start Date | Maintenance End Date |
-| :----------------------------------------------------------------------------------------------------------------------------: | :------------: | :------------------: |
-| [2022-06-07](https://github.com/Azure/azure-iot-sdk-csharp/releases/tag/lts_2021-3-18_patch6) <sub>patch 6 of 2021-03-18</sub> | 2021-03-18     | current              |
-| [2020-9-23](https://github.com/Azure/azure-iot-sdk-csharp/releases/tag/lts_2020-8-19_patch1) <sub>patch 1 of 2020-08-19</sub>  | 2020-08-19     | 2021-08-19           |
-| [2020-4-3](https://github.com/Azure/azure-iot-sdk-csharp/releases/tag/lts_2020-1-31_patch1) <sub>patch 1 of 2020-01-31</sub>   | 2020-01-31     | 2021-01-30           |
+- Have a feature request for SDKs? Please post it on [User Voice](https://feedback.azure.com/forums/321918-azure-iot) to help us prioritize.
+- Have a technical question? Ask on [Stack Overflow](https://stackoverflow.com/questions/tagged/azure-iot-hub) with tag “azure-iot-hub”.
+- Need Support? Every customer with an active Azure subscription has access to [support](https://docs.microsoft.com/azure/azure-supportability/how-to-create-azure-support-request) with guaranteed response time. Consider submitting a ticket and get assistance from Microsoft support team.
+- Found a bug? Please help us fix it by thoroughly documenting it and filing an issue on GitHub (C, Java, .NET, Node.js, Python).
 
 ---
 

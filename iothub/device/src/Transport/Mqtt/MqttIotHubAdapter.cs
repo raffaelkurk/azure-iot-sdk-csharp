@@ -23,7 +23,9 @@ using Microsoft.Azure.Devices.Client.Extensions;
 using Microsoft.Azure.Devices.Shared;
 
 #if NET5_0_OR_GREATER
+
 using TaskCompletionSource = System.Threading.Tasks.TaskCompletionSource;
+
 #else
 using TaskCompletionSource = Microsoft.Azure.Devices.Shared.TaskCompletionSource;
 #endif
@@ -209,7 +211,7 @@ namespace Microsoft.Azure.Devices.Client.Transport.Mqtt
             catch (Exception ex) when (!ex.IsFatal())
             {
                 if (Logging.IsEnabled)
-                    Logging.Error(this, $"Received a non-fatal exception while writing data to the MQTT transport layer, will shut down: {ex}", nameof(WriteAsync));
+                    Logging.Error(this, $"Received a non-fatal exception while writing data to the MQTT transport layer; will shut down: {ex}", nameof(WriteAsync));
 
                 ShutdownOnErrorAsync(context, ex);
                 throw;
@@ -341,14 +343,14 @@ namespace Microsoft.Azure.Devices.Client.Transport.Mqtt
 
                 string usernameString = $"{_iotHubHostName}/{id}/?{ClientApiVersionHelper.ApiVersionQueryStringLatest}&{DeviceClientTypeParam}={Uri.EscapeDataString(_productInfo.ToString())}";
 
-                if (!_mqttTransportSettings.AuthenticationChain.IsNullOrWhiteSpace())
+                if (!string.IsNullOrWhiteSpace(_mqttTransportSettings.AuthenticationChain))
                 {
                     usernameString += $"&{AuthChainParam}={Uri.EscapeDataString(_mqttTransportSettings.AuthenticationChain)}";
                 }
 
                 // This check is added to enable the device or module client to available plug and play features. For devices or modules that pass in the model Id,
                 // the SDK will enable plug and play features by appending the model Id to the MQTT CONNECT packet (in the username).
-                if (!(_options?.ModelId).IsNullOrWhiteSpace())
+                if (!string.IsNullOrWhiteSpace(_options?.ModelId))
                 {
                     usernameString += $"&{ModelIdParam}={Uri.EscapeDataString(_options.ModelId)}";
                 }
@@ -1108,7 +1110,7 @@ namespace Microsoft.Azure.Devices.Client.Transport.Mqtt
         {
             Stream bodyStream = message.GetBodyStream();
             byte[] buffer = new byte[bodyStream.Length];
-            bodyStream.Read(buffer, 0, buffer.Length);
+            _ = bodyStream.Read(buffer, 0, buffer.Length);
             IByteBuffer copiedBuffer = Unpooled.CopiedBuffer(buffer);
             return copiedBuffer;
         }

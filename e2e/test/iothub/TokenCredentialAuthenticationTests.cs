@@ -35,13 +35,15 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
 
 #if !NET451
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
+        [Ignore("Test infrastructure not currently available")]
         public async Task RegistryManager_Http_TokenCredentialAuth_Success()
         {
             // arrange
             using var registryManager = RegistryManager.Create(
-                TestConfiguration.IoTHub.GetIotHubHostName(),
-                TestConfiguration.IoTHub.GetClientSecretCredential());
+                TestConfiguration.IotHub.GetIotHubHostName(),
+                TestConfiguration.IotHub.GetClientSecretCredential());
 
             var device = new Device(Guid.NewGuid().ToString());
 
@@ -55,13 +57,15 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             await registryManager.RemoveDeviceAsync(device.Id).ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
+        [Ignore("Test infrastructure not currently available")]
         public async Task JobClient_Http_TokenCredentialAuth_Success()
         {
             // arrange
             using var jobClient = JobClient.Create(
-                TestConfiguration.IoTHub.GetIotHubHostName(),
-                TestConfiguration.IoTHub.GetClientSecretCredential());
+                TestConfiguration.IotHub.GetIotHubHostName(),
+                TestConfiguration.IotHub.GetClientSecretCredential());
 
             string jobId = "JOBSAMPLE" + Guid.NewGuid().ToString();
             string jobDeviceId = "JobsSample_Device";
@@ -86,11 +90,13 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             }
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
+        [Ignore("Test infrastructure not currently available")]
         public async Task DigitalTwinClient_Http_TokenCredentialAuth_Success()
         {
             // arrange
-            TestDevice testDevice = await TestDevice.GetTestDeviceAsync(Logger, _devicePrefix).ConfigureAwait(false);
+            TestDevice testDevice = await TestDevice.GetTestDeviceAsync(_devicePrefix).ConfigureAwait(false);
             string thermostatModelId = "dtmi:com:example:TemperatureController;1";
 
             // Create a device client instance initializing it with the "Thermostat" model.
@@ -104,8 +110,8 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             await deviceClient.OpenAsync().ConfigureAwait(false);
 
             using var digitalTwinClient = DigitalTwinClient.Create(
-                TestConfiguration.IoTHub.GetIotHubHostName(),
-                TestConfiguration.IoTHub.GetClientSecretCredential());
+                TestConfiguration.IotHub.GetIotHubHostName(),
+                TestConfiguration.IotHub.GetClientSecretCredential());
 
             // act
             HttpOperationResponse<ThermostatTwin, DigitalTwinGetHeaders> response = await digitalTwinClient
@@ -120,14 +126,16 @@ namespace Microsoft.Azure.Devices.E2ETests.IotHub.Service
             await testDevice.RemoveDeviceAsync().ConfigureAwait(false);
         }
 
-        [LoggedTestMethod, Timeout(TestTimeoutMilliseconds)]
+        [TestMethod]
+        [Timeout(TestTimeoutMilliseconds)]
+        [Ignore("Test infrastructure not currently available")]
         public async Task Service_Amqp_TokenCredentialAuth_Success()
         {
             // arrange
             string ghostDevice = $"{nameof(Service_Amqp_TokenCredentialAuth_Success)}_{Guid.NewGuid()}";
             using var serviceClient = ServiceClient.Create(
-                TestConfiguration.IoTHub.GetIotHubHostName(),
-                TestConfiguration.IoTHub.GetClientSecretCredential(),
+                TestConfiguration.IotHub.GetIotHubHostName(),
+                TestConfiguration.IotHub.GetClientSecretCredential(),
                 TransportType.Amqp);
             await serviceClient.OpenAsync().ConfigureAwait(false);
             using var message = new Message(Encoding.ASCII.GetBytes("Hello, Cloud!"));
